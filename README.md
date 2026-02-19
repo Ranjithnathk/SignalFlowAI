@@ -1,1 +1,2 @@
-# SingalFlowAI
+# SignalFlowAI
+

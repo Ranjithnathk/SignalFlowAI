@@ -1,0 +1,31 @@
+version: 2
+
+models:
+  - name: clean_reviews
+    columns:
+      - name: asin
+        tests: [not_null]
+      - name: category
+        tests: [not_null]
+      - name: ingest_dt
+        tests: [not_null]
+      - name: review_length
+        tests: [not_null]
+      - name: positive_flag
+        tests: [not_null]
+
+  - name: clean_meta
+    columns:
+      - name: asin
+        tests: [not_null]
+      - name: category
+        tests: [not_null]
+      - name: ingest_dt
+        tests: [not_null]
+
+  - name: product_health_daily
+    columns:
+      - name: asin
+        tests: [not_null]
+      - name: ingest_dt
+        tests: [not_null]

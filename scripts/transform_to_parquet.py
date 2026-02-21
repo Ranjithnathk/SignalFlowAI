@@ -1,9 +1,7 @@
 import argparse
 import gzip
-import io
 import json
 import os
-import sys
 from datetime import datetime, timezone
 from typing import Dict, Iterable, List, Optional, Set, Tuple
 
@@ -11,7 +9,6 @@ import boto3
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
-import s3fs
 import yaml
 from dotenv import load_dotenv
 
@@ -134,17 +131,9 @@ def safe_float(x) -> Optional[float]:
 # ----------------------------
 
 def normalize_review(rec: dict, category: str, ingest_dt: str) -> Optional[Dict]:
+    # ELT-first: NO filtering, NO derived flags/length here.
     asin = rec.get("asin")
-    review_text = rec.get("reviewText")
-
-    if not asin or not review_text:
-        return None
-
-    review_text = str(review_text)
-    review_len = len(review_text)
-
-    # Filter: reviewText length > 30
-    if review_len <= 30:
+    if not asin:
         return None
 
     overall = rec.get("overall")
@@ -153,8 +142,11 @@ def normalize_review(rec: dict, category: str, ingest_dt: str) -> Optional[Dict]
     except Exception:
         overall_num = None
 
+    review_text = rec.get("reviewText")
+    review_text = None if review_text is None else str(review_text)
+
     out = {
-        "asin": asin,
+        "asin": str(asin),
         "reviewerID": rec.get("reviewerID"),
         "reviewerName": rec.get("reviewerName"),
         "overall": overall_num,
@@ -167,11 +159,6 @@ def normalize_review(rec: dict, category: str, ingest_dt: str) -> Optional[Dict]
         # lineage
         "category": category,
         "ingest_dt": ingest_dt,
-        # derived
-        "review_length": review_len,
-        "positive_flag": 1 if (overall_num is not None and overall_num >= 4.0) else 0,
-        "neutral_flag": 1 if (overall_num is not None and overall_num == 3.0) else 0,
-        "negative_flag": 1 if (overall_num is not None and overall_num <= 2.0) else 0,
     }
     return out
 
@@ -228,44 +215,16 @@ def transform_reviews(
 
     return rows_written, len(asins)
 
-
-def load_asins_from_reviews_parquet(bucket: str, category: str, ingest_dt: str) -> Set[str]:
-    """
-    Reads only the 'asin' column from already-created landing parquet for reviews.
-    Uses s3fs so it works without requiring pyarrow S3 support.
-    """
-    fs = s3fs.S3FileSystem(anon=False)
-    prefix = f"{bucket}/{landing_prefix('reviews', category, ingest_dt)}"
-    # s3fs expects paths like "bucket/key"
-    matches = fs.glob(prefix + "*.parquet")
-    if not matches:
-        raise RuntimeError(
-            f"Meta transform requires reviews parquet first. None found under s3://{bucket}/{landing_prefix('reviews', category, ingest_dt)}"
-        )
-
-    asins: Set[str] = set()
-    for path in matches:
-        with fs.open(path, "rb") as f:
-            tbl = pq.read_table(f, columns=["asin"])
-            col = tbl.column("asin").to_pylist()
-            for a in col:
-                if a:
-                    asins.add(str(a))
-
-    return asins
-
-
 # ----------------------------
 # Meta transform
 # ----------------------------
 
-def normalize_meta(rec: dict, category: str, ingest_dt: str, allowed_asins: Set[str]) -> Optional[Dict]:
+def normalize_meta(rec: dict, category: str, ingest_dt: str) -> Optional[Dict]:
+    # ELT-first: NO filtering by allowed_asins here.
     asin = rec.get("asin")
     if not asin:
         return None
     asin = str(asin)
-    if asin not in allowed_asins:
-        return None
 
     out = {
         "asin": asin,
@@ -273,7 +232,6 @@ def normalize_meta(rec: dict, category: str, ingest_dt: str, allowed_asins: Set[
         "brand": rec.get("brand"),
         "price": safe_float(rec.get("price")),
         "main_cat": rec.get("main_cat"),
-        # category list can be large; keep it but as string for simplicity in Snowflake later
         "category_list": json.dumps(rec.get("category")) if isinstance(rec.get("category"), list) else rec.get("category"),
         # lineage
         "category": category,
@@ -289,7 +247,6 @@ def transform_meta(
     category: str,
     ingest_dt: str,
     chunk_rows: int,
-    allowed_asins: Set[str],
 ) -> int:
     prefix = source_prefix("meta", category, ingest_dt)
     keys = list_s3_keys(s3_client, bucket, prefix)
@@ -305,7 +262,7 @@ def transform_meta(
     for key in keys:
         print(f"[INFO] Reading meta: s3://{bucket}/{key}")
         for rec in stream_ucsd_json_gz_lines(s3_client, bucket, key):
-            norm = normalize_meta(rec, category, ingest_dt, allowed_asins)
+            norm = normalize_meta(rec, category, ingest_dt)
             if norm is None:
                 continue
 
@@ -344,7 +301,7 @@ def main():
         "--dataset",
         choices=["reviews", "meta", "both"],
         default="both",
-        help="Transform which dataset (default: both). Meta requires reviews parquet for ASIN filter.",
+        help="Transform which dataset (default: both).",
     )
     parser.add_argument("--ingest-dt", default=None, help="YYYY-MM-DD (default: today UTC)")
     parser.add_argument("--chunk-rows", type=int, default=200_000, help="Rows per parquet part file")
@@ -377,8 +334,6 @@ def main():
 
     if args.dataset in {"meta", "both"}:
         # Meta filter requires ASINs from filtered reviews parquet
-        allowed_asins = load_asins_from_reviews_parquet(bucket=bucket, category=args.category, ingest_dt=ingest_dt)
-        print(f"[INFO] Loaded allowed ASINs from reviews parquet: {len(allowed_asins)}")
 
         rows_written = transform_meta(
             s3_client=s3_client,
@@ -386,7 +341,6 @@ def main():
             category=args.category,
             ingest_dt=ingest_dt,
             chunk_rows=args.chunk_rows,
-            allowed_asins=allowed_asins,
         )
         print(f"[DONE] Meta parquet written: {rows_written} rows")
 

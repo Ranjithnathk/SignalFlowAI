@@ -1,7 +1,7 @@
 """
-SignalFlowAI — DAG 1: Ingest (UCSD → S3 → Parquet)
+SignalFlowAI - DAG 1: Ingest (UCSD → S3 → Parquet)
 
-Runs on-demand / manually triggered — not on a schedule.
+Runs on-demand / manually triggered - not on a schedule.
 We already have the full dataset in S3. This DAG only needs to run
 if the UCSD source is refreshed or new categories are added.
 
@@ -11,7 +11,7 @@ if the UCSD source is refreshed or new categories are added.
 Duplication safety:
   Snowflake COPY INTO (DAG 2) tracks all previously loaded files in its internal
   metadata table, so re-uploading the same Parquet files to S3 will NOT cause
-  duplicate rows in Snowflake — the COPY step simply skips files it has seen before.
+  duplicate rows in Snowflake - the COPY step simply skips files it has seen before.
 
 Connections required:
   None (AWS credentials resolved from the Airflow worker's IAM role or env vars)

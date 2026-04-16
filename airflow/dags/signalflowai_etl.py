@@ -1,5 +1,5 @@
 """
-SignalFlowAI — DAG 2: ETL (S3 → Snowflake → dbt → Cortex Search)
+SignalFlowAI - DAG 2: ETL (S3 → Snowflake → dbt → Cortex Search)
 
 Runs daily at 3 AM. Short-circuits if no new Parquet files are in S3 today,
 so the pipeline is a no-op on days when no new data was ingested.
@@ -12,7 +12,7 @@ so the pipeline is a no-op on days when no new data was ingested.
 
 Duplication safety:
   Snowflake COPY INTO tracks every file it has loaded in an internal metadata
-  table. Re-running on the same S3 files is safe — they are silently skipped.
+  table. Re-running on the same S3 files is safe - they are silently skipped.
 
 Connections required in Airflow UI:
   snowflake_default : Snowflake connection (account, user, keypair auth)
@@ -62,7 +62,7 @@ def check_new_s3_data(**context) -> bool:
     Returns True if today's S3 Parquet partition exists (i.e. DAG 1 has run today).
     Short-circuits all downstream tasks if there is nothing new to load.
 
-    In production this is the standard pattern — ingest DAG writes data,
+    In production this is the standard pattern - ingest DAG writes data,
     ETL DAG checks before doing expensive Snowflake + dbt work.
     """
     import boto3
@@ -80,7 +80,7 @@ def check_new_s3_data(**context) -> bool:
 
     if not has_data:
         print(
-            f"No new data at s3://{bucket}/{prefix} — "
+            f"No new data at s3://{bucket}/{prefix} - "
             "short-circuiting ETL pipeline for today."
         )
     return has_data
@@ -139,12 +139,12 @@ with DAG(
         },
         doc_md=(
             "Loads new Parquet files from S3 external stage into RAW.REVIEWS and RAW.METADATA. "
-            "COPY INTO is idempotent — previously loaded files are tracked and skipped automatically."
+            "COPY INTO is idempotent - previously loaded files are tracked and skipped automatically."
         ),
     )
 
     # -----------------------------------------------------------------------
-    # Task 2: dbt run — CLEAN → CURATED → RAG
+    # Task 2: dbt run - CLEAN → CURATED → RAG
     # -----------------------------------------------------------------------
     dbt_run = BashOperator(
         task_id="dbt_run",
@@ -161,7 +161,7 @@ with DAG(
     )
 
     # -----------------------------------------------------------------------
-    # Task 3: dbt test — data quality gates
+    # Task 3: dbt test - data quality gates
     # -----------------------------------------------------------------------
     dbt_test = BashOperator(
         task_id="dbt_test",
@@ -171,7 +171,7 @@ with DAG(
         ),
         doc_md=(
             "Runs dbt schema tests: not_null, unique, accepted_values on complaint_type. "
-            "If tests fail, the DAG halts here — Cortex Search is never updated with bad data."
+            "If tests fail, the DAG halts here - Cortex Search is never updated with bad data."
         ),
     )
 

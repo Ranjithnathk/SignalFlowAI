@@ -63,7 +63,7 @@ def score_bar(score, width: int = 20) -> str:
 
 def confidence_label(conf: str) -> str:
     colors = {"High": "✅ High", "Medium": "⚠️  Medium", "Low": "❌ Low"}
-    return colors.get(conf, conf or "—")
+    return colors.get(conf, conf or "-")
 
 
 def load_details() -> list[dict]:
@@ -84,7 +84,7 @@ def load_summary() -> dict:
 
 def print_summary(summary: dict) -> None:
     print(DIVIDER)
-    print("  SIGNALFLOWAI — EVALUATION SUMMARY")
+    print("  SIGNALFLOWAI - EVALUATION SUMMARY")
     print(DIVIDER)
     print(f"  Total questions  : {summary.get('total_questions', '?')}")
     print(f"  Evaluated        : {summary.get('evaluated', '?')}")
@@ -142,16 +142,16 @@ def print_question(row: dict, index: int, total: int) -> None:
     print()
 
     print(THIN)
-    print("  PIPELINE — Query Agent interpreted intent:")
+    print("  PIPELINE - Query Agent interpreted intent:")
     print(wrap(intent, indent=4))
     print()
-    print("  PIPELINE — Retrieval Agent notes:")
+    print("  PIPELINE - Retrieval Agent notes:")
     print(wrap(retrieval_notes, indent=4))
     print()
-    print("  PIPELINE — Reasoning Agent answer (GPT-4o):")
+    print("  PIPELINE - Reasoning Agent answer (GPT-4o):")
     print(wrap(pipeline_answer, indent=4))
     print()
-    print("  PIPELINE — Verifier Agent:")
+    print("  PIPELINE - Verifier Agent:")
     print(wrap(verification, indent=4))
     print()
 
@@ -206,7 +206,7 @@ def main() -> None:
         print_question(row, idx, len(filtered))
 
     print(DIVIDER)
-    print(f"  End of evaluation report — {len(filtered)} question(s) shown")
+    print(f"  End of evaluation report - {len(filtered)} question(s) shown")
     print(DIVIDER)
 
 

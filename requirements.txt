@@ -22,6 +22,7 @@ faiss-cpu
 rank-bm25
 scikit-learn
 streamlit
+plotly
 google-genai
 openai
 einops

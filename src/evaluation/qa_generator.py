@@ -32,7 +32,7 @@ import snowflake.connector
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
-QA_PER_COMBINATION = 1   # Q&A pairs generated per (category, complaint_type) — 10 total across all combinations
+QA_PER_COMBINATION = 1   # Q&A pairs generated per (category, complaint_type) - 10 total across all combinations
 SAMPLE_SIZE = 15          # complaints sampled per combination to feed the LLM
 
 CATEGORIES = ["electronics", "home_kitchen"]
@@ -109,7 +109,7 @@ CRITICAL RULES for answers:
 - Answers must be grounded strictly in the complaints provided
 - Each answer MUST follow exactly this format:
     Main issue: <concise description of the recurring pattern across products>
-    Affected scope: <product group, brand cluster, or complaint subtype — NOT one specific product>
+    Affected scope: <product group, brand cluster, or complaint subtype - NOT one specific product>
     Recommended action: <one of: investigate product quality and supplier manufacturing issues | audit logistics and delivery operations | review fulfillment and packaging processes | monitor issue trend and investigate further>
 - Include doc_ids of 2-3 most representative complaints as evidence
 

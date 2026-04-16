@@ -1,5 +1,5 @@
 """
-SignalFlowAI Phase 9 — Evaluation Runner.
+SignalFlowAI Phase 9 - Evaluation Runner.
 
 Loads the QA benchmark, runs every question through the full 4-agent pipeline,
 scores each result using Groq/Llama-3.3-70b as judge, and saves results.
@@ -8,9 +8,9 @@ Run:
     python src/evaluation/run_eval.py
 
 Output:
-    src/evaluation/data/eval_results.csv  — per-question scores only
-    src/evaluation/data/eval_details.csv  — ground truth vs pipeline answer (human-readable)
-    src/evaluation/data/eval_summary.csv  — aggregate metrics
+    src/evaluation/data/eval_results.csv  - per-question scores only
+    src/evaluation/data/eval_details.csv  - ground truth vs pipeline answer (human-readable)
+    src/evaluation/data/eval_summary.csv  - aggregate metrics
 """
 
 from __future__ import annotations
@@ -162,7 +162,7 @@ def main():
             f"Confidence={scores.get('confidence_raw')}"
         )
 
-        time.sleep(10.0)  # Proactive buffer between questions — avoids Groq free-tier rate limit
+        time.sleep(10.0)  # Proactive buffer between questions - avoids Groq free-tier rate limit
 
     # -----------------------------------------------------------------------
     # Save per-question scores (clean, no answer text)

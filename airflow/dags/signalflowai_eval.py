@@ -1,5 +1,5 @@
 """
-SignalFlowAI — DAG 3: Evaluation Benchmark (Weekly, Mondays)
+SignalFlowAI - DAG 3: Evaluation Benchmark (Weekly, Mondays)
 
 Runs every Monday at 4 AM. Executes the Phase 9 evaluation pipeline:
   - Generates 10 benchmark Q&A pairs (OpenAI GPT-4o-mini)
@@ -13,7 +13,7 @@ Model separation (by design):
   Groq    → LLM-as-Judge only (independent, never touches the pipeline)
 
 This separation ensures the judge is architecturally independent from the
-system under evaluation — a core principle of the RAGalyst evaluation framework.
+system under evaluation - a core principle of the RAGalyst evaluation framework.
 
 Connections required:
   None (API keys resolved from Airflow Variables or worker environment)
@@ -85,10 +85,10 @@ with DAG(
         doc_md=(
             "Runs each benchmark question through the LangGraph 4-agent pipeline, "
             "then scores 4 RAGalyst metrics using Groq Llama-3.3-70b as independent judge:\n"
-            "  1. Retrieval Relevance  — continuous 0–1\n"
-            "  2. Answerability        — binary 0/1\n"
-            "  3. Answer Correctness   — continuous 0–1\n"
-            "  4. Faithfulness         — continuous 0–1\n"
+            "  1. Retrieval Relevance  - continuous 0–1\n"
+            "  2. Answerability        - binary 0/1\n"
+            "  3. Answer Correctness   - continuous 0–1\n"
+            "  4. Faithfulness         - continuous 0–1\n"
             "Results written to src/evaluation/data/eval_details.csv.\n"
             "Inter-metric sleeps (5s) and inter-question sleeps (10s) handle "
             "Groq free-tier rate limits."

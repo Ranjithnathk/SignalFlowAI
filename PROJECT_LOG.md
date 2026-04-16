@@ -19,7 +19,7 @@
 ## Week 2 (02/07/2026)
 We realized that the core problem we want to solve is not predicting risks, but helping organizations learn from real operational signals and make better preventive decisions. So we reworked on our business problem and project focus.
 
-Updated idea: **SignalFlow AI** is a decision-intelligence system that learns from customer-reported issues such as support tickets and complaints—to identify recurring operational problems and help teams fix root causes before issues repeat.
+Updated idea: **SignalFlow AI** is a decision-intelligence system that learns from customer-reported issues such as support tickets and complaints-to identify recurring operational problems and help teams fix root causes before issues repeat.
 This project solves a real business problem faced by large platforms, repeated customer issues that are handled reactively but uses publicly available, text-rich datasets. It allows us to demonstrate data engineering, agentic reasoning, and RAG without relying on hard-to-access data sources.
 
 --

@@ -1,13 +1,13 @@
 """
-SignalFlowAI — Airflow Pipeline DAG  [SUPERSEDED]
+SignalFlowAI - Airflow Pipeline DAG  [SUPERSEDED]
 
 This single monolithic DAG has been split into three focused DAGs.
-This file is kept for reference only — it is NOT registered with Airflow.
+This file is kept for reference only - it is NOT registered with Airflow.
 
 New DAGs (use these instead):
-  signalflowai_ingest.py  — DAG 1: UCSD → S3 → Parquet  (manual/on-demand)
-  signalflowai_etl.py     — DAG 2: S3 → Snowflake → dbt → Cortex Search  (daily 3 AM)
-  signalflowai_eval.py    — DAG 3: Evaluation benchmark  (weekly Mondays 4 AM)
+  signalflowai_ingest.py  - DAG 1: UCSD → S3 → Parquet  (manual/on-demand)
+  signalflowai_etl.py     - DAG 2: S3 → Snowflake → dbt → Cortex Search  (daily 3 AM)
+  signalflowai_eval.py    - DAG 3: Evaluation benchmark  (weekly Mondays 4 AM)
 
 Why split?
   - Ingest only needs to run when UCSD data is refreshed (very rare)

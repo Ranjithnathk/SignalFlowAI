@@ -7,10 +7,11 @@ from pathlib import Path
 
 import html as html_lib
 import pandas as pd
+import plotly.express as px
 import streamlit as st
 
 # ---------------------------------------------------------------------------
-# Path setup — allow running from project root: streamlit run src/app/app.py
+# Path setup - allow running from project root: streamlit run src/app/app.py
 # ---------------------------------------------------------------------------
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
@@ -39,7 +40,7 @@ _LABEL_MAP = {
     "Any": "Any",
     "electronics": "Electronics",
     "home_kitchen": "Home & Kitchen",
-    "damage_defect": "Damage / Defect",
+    "damage_defect": "Damage Defect",
     "missing_parts": "Missing Parts",
     "delivery_issue": "Delivery Issue",
     "wrong_item": "Wrong Item",
@@ -246,7 +247,7 @@ def _build_filters(category: str, complaint_type: str) -> dict | None:
 
 
 # ---------------------------------------------------------------------------
-# Product Health Dashboard — Snowflake direct queries
+# Product Health Dashboard - Snowflake direct queries
 # ---------------------------------------------------------------------------
 
 def _load_snowflake_private_key() -> bytes:
@@ -288,12 +289,12 @@ def _get_snowflake_conn():
 
 
 # ---------------------------------------------------------------------------
-# Analytics Dashboard — constants and query helpers
+# Analytics Dashboard - constants and query helpers
 # ---------------------------------------------------------------------------
 
 # Only the 5 high-impact complaint types used in this project
 _VALID_TYPES = ("damage_defect", "delivery_issue", "missing_parts", "quality_issue", "wrong_item")
-_TYPES_IN = "'" + "', '".join(_VALID_TYPES) + "'"   # safe constant — no user input
+_TYPES_IN = "'" + "', '".join(_VALID_TYPES) + "'"   # safe constant - no user input
 
 
 def _run_query(sql: str, params: list | None = None) -> pd.DataFrame:
@@ -331,7 +332,7 @@ def _query_overview(category: str) -> dict:
 
 @st.cache_data(ttl=600)
 def _query_complaint_type_dist(category: str) -> pd.DataFrame:
-    """Complaint count per type — only the 5 defined types, no 'other'."""
+    """Complaint count per type - only the 5 defined types, no 'other'."""
     params: list = []
     extra = ""
     if category and category != "Any":
@@ -387,7 +388,7 @@ def _query_top_brands(category: str, limit: int = 15) -> pd.DataFrame:
 
 @st.cache_data(ttl=600)
 def _query_subcategory_dist(category: str, complaint_type: str) -> pd.DataFrame:
-    """Top complaint sub-types — excludes blank/other entries."""
+    """Top complaint sub-types - excludes blank/other entries."""
     params: list = []
     extra_parts = []
     if category and category != "Any":
@@ -468,14 +469,14 @@ def _query_brand_products(category: str, brand_filter: str) -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------------------
-# Analytics Dashboard — render
+# Analytics Dashboard - render
 # ---------------------------------------------------------------------------
 
 def _render_product_health_tab(category: str, complaint_type: str) -> None:
     st.markdown("### Review Analytics Dashboard")
     st.caption(
         "Based on **828K signal-scored complaints** (signal score ≥ 3) across Electronics and "
-        "Home & Kitchen — filtered from 43M raw reviews via the ETL pipeline. "
+        "Home & Kitchen - filtered from 43M raw reviews via the ETL pipeline. "
         "Covers the 5 high-impact complaint types only."
     )
 
@@ -508,7 +509,16 @@ def _render_product_health_tab(category: str, complaint_type: str) -> None:
             ct_df = _query_complaint_type_dist(category)
             if not ct_df.empty:
                 ct_df["complaint_type"] = ct_df["complaint_type"].map(_fmt)
-                st.bar_chart(ct_df.set_index("complaint_type")[["complaint_count"]], use_container_width=True)
+                fig = px.pie(
+                    ct_df,
+                    names="complaint_type",
+                    values="complaint_count",
+                    color_discrete_sequence=px.colors.qualitative.Bold,
+                    hole=0.35,
+                )
+                fig.update_traces(textposition="inside", textinfo="percent+label")
+                fig.update_layout(margin=dict(t=10, b=10, l=10, r=10), showlegend=False)
+                st.plotly_chart(fig, use_container_width=True)
                 st.caption("Complaint volume across the 5 defined complaint types.")
         except Exception as e:
             st.error(str(e))
@@ -526,7 +536,7 @@ def _render_product_health_tab(category: str, complaint_type: str) -> None:
                 st.error(str(e))
         else:
             lbl = _fmt(complaint_type) if complaint_type != "Any" else "all types"
-            st.markdown(f"#### Sub-categories — {lbl}")
+            st.markdown(f"#### Sub-categories - {lbl}")
             try:
                 sub_df = _query_subcategory_dist(category, complaint_type)
                 if not sub_df.empty:
@@ -564,11 +574,11 @@ def _render_product_health_tab(category: str, complaint_type: str) -> None:
     if category != "Any":
         lbl += f" in {_fmt(category)}"
     if complaint_type != "Any":
-        lbl += f" — {_fmt(complaint_type)}"
+        lbl += f" - {_fmt(complaint_type)}"
 
-    st.markdown(f"#### Top 10 Most Complained Products{lbl}")
+    st.markdown(f"#### Top 20 Most Complained Products{lbl}")
     try:
-        prod_df = _query_top_products(category, complaint_type, limit=10)
+        prod_df = _query_top_products(category, complaint_type, limit=20)
         if not prod_df.empty:
             display_p = prod_df.copy()
             display_p.columns = ["Product", "Product ID", "Brand", "Category", "Complaints", "Complaint Types"]
@@ -583,9 +593,9 @@ def _render_product_health_tab(category: str, complaint_type: str) -> None:
     st.divider()
 
     # -----------------------------------------------------------------------
-    # Section 5: Brand deep-dive — products list
+    # Section 5: Brand deep-dive - products list
     # -----------------------------------------------------------------------
-    st.markdown("#### Brand Deep-Dive — Products & Complaints")
+    st.markdown("#### Brand Deep-Dive - Products & Complaints")
     brand_filter = st.text_input(
         "Search brand (partial match)",
         placeholder="e.g. Sony, Samsung, Instant Pot",
@@ -619,7 +629,7 @@ def _render_product_health_tab(category: str, complaint_type: str) -> None:
     st.bar_chart(brand_ct.set_index("complaint_type")[["complaint_count"]], use_container_width=True)
 
     # Products table
-    st.markdown(f"**Products under '{brand_filter}'** — top {len(bp_df)} by complaint count")
+    st.markdown(f"**Products under '{brand_filter}'** - top {len(bp_df)} by complaint count")
     display = bp_df.copy()
     display.columns = ["Product", "Product ID", "Complaint Type", "Complaint Count"]
     display["Product"] = display["Product"].apply(html_lib.unescape)
@@ -632,9 +642,9 @@ def _render_product_health_tab(category: str, complaint_type: str) -> None:
 # ---------------------------------------------------------------------------
 
 def _render_decision_tab(selected_category: str, selected_complaint: str, top_k: int) -> None:
-    # Sample query buttons — dynamic based on sidebar filters
+    # Sample query buttons - dynamic based on sidebar filters
     sample_queries = get_sample_queries(selected_category, selected_complaint)
-    st.markdown("**Quick start — try a sample query:**")
+    st.markdown("**Quick start - try a sample query:**")
     cols = st.columns(len(sample_queries))
     for col, sample in zip(cols, sample_queries):
         if col.button(sample, use_container_width=True):
@@ -652,15 +662,15 @@ def _render_decision_tab(selected_category: str, selected_complaint: str, top_k:
 
     run_clicked = st.button("Run Analysis", type="primary", use_container_width=True)
 
-    # Active filter indicator — always visible so user knows what's applied
+    # Active filter indicator - always visible so user knows what's applied
     _filter_parts = []
     if selected_category != "Any":
         _filter_parts.append(f"Category: **{_fmt(selected_category)}**")
     if selected_complaint != "Any":
         _filter_parts.append(f"Type: **{_fmt(selected_complaint)}**")
     _filter_parts.append(f"Top **{top_k}** complaints")
-    st.caption("Filters active — " + " | ".join(_filter_parts) if len(_filter_parts) > 1
-               else "No category/type filters — searching across all data | Top **{}** complaints".format(top_k))
+    st.caption("Filters active - " + " | ".join(_filter_parts) if len(_filter_parts) > 1
+               else "No category/type filters - searching across all data | Top **{}** complaints".format(top_k))
 
     if not run_clicked:
         return
@@ -763,16 +773,15 @@ def _render_decision_tab(selected_category: str, selected_complaint: str, top_k:
 
 def main() -> None:
     st.set_page_config(
-        page_title="SignalFlowAI — Decision Intelligence",
+        page_title="SignalFlowAI - Decision Intelligence",
         page_icon="⚡",
         layout="wide",
     )
 
     st.markdown("""
     <style>
-    /* Metric cards */
+    /* Metric cards — border accent only, works in light + dark */
     div[data-testid="metric-container"] {
-        background: linear-gradient(135deg, #0d1f3c 0%, #1a2f52 100%);
         border: 1px solid #29B5E8;
         border-radius: 12px;
         padding: 14px 18px;
@@ -785,14 +794,12 @@ def main() -> None:
         text-transform: uppercase;
     }
     div[data-testid="stMetricValue"] {
-        color: #ffffff !important;
         font-size: 1.7rem;
         font-weight: 800;
     }
 
-    /* Sidebar */
+    /* Sidebar — accent border only */
     section[data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #050d1a 0%, #0d1a30 100%);
         border-right: 2px solid #29B5E8;
     }
     section[data-testid="stSidebar"] h2 {
@@ -811,6 +818,7 @@ def main() -> None:
         font-size: 0.95rem;
         letter-spacing: 0.04em;
         padding: 10px 0;
+        color: white !important;
         transition: opacity 0.18s ease;
     }
     .stButton > button[kind="primary"]:hover { opacity: 0.85; }
@@ -819,7 +827,7 @@ def main() -> None:
     .stButton > button[kind="secondary"] {
         border: 1px solid #29B5E8;
         border-radius: 8px;
-        color: #29B5E8;
+        color: #29B5E8 !important;
         background: transparent;
         font-size: 0.82rem;
         transition: background 0.15s ease;
@@ -828,30 +836,21 @@ def main() -> None:
         background: rgba(41,181,232,0.12);
     }
 
-    /* Bordered containers (decision intelligence cards) */
+    /* Bordered containers — accent border, no forced background */
     div[data-testid="stVerticalBlockBorderWrapper"] {
-        border-color: #1e3a5f !important;
+        border-color: #29B5E8 !important;
         border-radius: 14px !important;
-        background: linear-gradient(135deg, #080f1e 0%, #0d1a30 100%);
-        padding: 4px;
     }
 
     /* Tab bar */
     div[data-testid="stTabs"] button[data-baseweb="tab"] {
         font-weight: 600;
         font-size: 0.95rem;
-        color: #8b9ab5;
     }
     div[data-testid="stTabs"] button[data-baseweb="tab"][aria-selected="true"] {
         color: #29B5E8 !important;
         border-bottom-color: #29B5E8 !important;
     }
-
-    /* Section headings h4 */
-    h4 { color: #c9d6e8; }
-
-    /* Divider */
-    hr { border-color: #1e2d45 !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -860,14 +859,14 @@ def main() -> None:
         """
         <h1 style='margin-bottom:0'>⚡ SignalFlowAI</h1>
         <p style='color:#888;margin-top:4px;font-size:1.05rem;'>
-        Operational Decision Intelligence — powered by Snowflake Cortex Search + LangGraph Agents
+        Operational Decision Intelligence - powered by Snowflake Cortex Search + LangGraph Agents
         </p>
         <hr style='margin-top:8px;margin-bottom:24px;border-color:#333'>
         """,
         unsafe_allow_html=True,
     )
 
-    # Sidebar — shared across both tabs
+    # Sidebar - shared across both tabs
     with st.sidebar:
         st.header("Filters (optional)")
         st.caption("Narrow retrieval to a specific category or complaint type.")

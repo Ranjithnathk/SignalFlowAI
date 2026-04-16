@@ -1,14 +1,14 @@
 """
-SignalFlowAI Phase 9 — Evaluation Engine.
+SignalFlowAI Phase 9 - Evaluation Engine.
 
 Judges are deliberately run on Groq (Llama-3.3-70b) to show differentiation
 from the OpenAI-based reasoning pipeline.
 
 Four metrics (per RAGalyst paper definitions):
-  1. Retrieval Relevance  — continuous 0–1: are retrieved complaints relevant to the query?
-  2. Answerability        — binary 0 or 1: does the evidence support answering the question?
-  3. Answer Correctness   — continuous 0–1: does the pipeline output match ground truth?
-  4. Faithfulness         — continuous 0–1: are the answer's claims grounded in retrieved evidence? (Groq judge)
+  1. Retrieval Relevance  - continuous 0–1: are retrieved complaints relevant to the query?
+  2. Answerability        - binary 0 or 1: does the evidence support answering the question?
+  3. Answer Correctness   - continuous 0–1: does the pipeline output match ground truth?
+  4. Faithfulness         - continuous 0–1: are the answer's claims grounded in retrieved evidence? (Groq judge)
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ GROQ_JUDGE_MODEL = "llama-3.3-70b-versatile"
 
 
 def _with_retries(fn, retries: int = 5, delay: float = 15.0):
-    """Retry with exponential backoff — handles Groq free-tier rate limits (429)."""
+    """Retry with exponential backoff - handles Groq free-tier rate limits (429)."""
     for attempt in range(retries):
         try:
             return fn()
@@ -76,7 +76,7 @@ def judge_retrieval_relevance(
     """
     Score 0-1: How relevant are the retrieved complaints to the query?
     1.0 = majority of complaints match the query's complaint type and category
-    0.5 = partial match — complaint type correct but scope mixed
+    0.5 = partial match - complaint type correct but scope mixed
     0.0 = off-topic complaints retrieved
     """
     evidence_text = "\n".join(
@@ -95,7 +95,7 @@ def judge_retrieval_relevance(
     prompt = f"""You are evaluating retrieval quality for an operational complaint intelligence system.
 
 The system classifies complaints into types (damage_defect, missing_parts, delivery_issue, wrong_item, quality_issue)
-and categories (electronics, home_kitchen). The 'complaint_type' field is the system's classification — trust it.
+and categories (electronics, home_kitchen). The 'complaint_type' field is the system's classification - trust it.
 
 Query: {query}
 
@@ -103,7 +103,7 @@ Retrieved complaints:
 {evidence_text}
 
 Score how well the retrieved complaints match the query intent on a continuous scale from 0.0 to 1.0.
-Use the full range — do not limit yourself to 0.0, 0.5, or 1.0 only.
+Use the full range - do not limit yourself to 0.0, 0.5, or 1.0 only.
 
 Examples:
 - 0.9–1.0 = nearly all complaints match the complaint_type and category in the query
@@ -112,7 +112,7 @@ Examples:
 - 0.1–0.3 = few complaints match, mostly off-topic
 - 0.0 = completely off-topic
 
-Focus on complaint_type and category alignment — not on the summary wording.
+Focus on complaint_type and category alignment - not on the summary wording.
 
 Return only valid JSON: {{"score": 0.0}}"""
 
@@ -141,14 +141,14 @@ def judge_answerability(
 ) -> float:
     """
     Binary 0 or 1: Can the retrieved evidence support an answer to the question?
-    Per RAGalyst paper: Answerability is a binary judgment — 1 if the evidence is
+    Per RAGalyst paper: Answerability is a binary judgment - 1 if the evidence is
     sufficient to answer, 0 if it is not. Measures evidence quality, not answer quality.
     """
     all_types = [r.get("complaint_type", "") for r in evidence]
     dominant_type = max(set(all_types), key=all_types.count) if all_types else ""
     match_count = sum(1 for t in all_types if t == dominant_type)
 
-    # Compact evidence summary — complaint_type + subtype only, to keep prompt short
+    # Compact evidence summary - complaint_type + subtype only, to keep prompt short
     evidence_summary = "; ".join(
         f"{r.get('complaint_type','')}({r.get('complaint_subtype','')})"
         for r in evidence[:10]
@@ -163,8 +163,8 @@ Dominant complaint_type: {dominant_type} ({match_count}/{len(evidence)} complain
 Complaint types present: {evidence_summary}
 
 Can the retrieved evidence support a meaningful answer to the question above?
-Answer 1 if YES — the evidence contains relevant complaints that match the question's topic.
-Answer 0 if NO — the evidence is off-topic or too sparse to answer.
+Answer 1 if YES - the evidence contains relevant complaints that match the question's topic.
+Answer 0 if NO - the evidence is off-topic or too sparse to answer.
 
 Return only valid JSON: {{"score": 1}} or {{"score": 0}}"""
 
@@ -244,17 +244,17 @@ Predicted main issue (from pipeline Issue Summary):
 Predicted recommended actions (from pipeline Recommended Actions):
 {pipeline_actions}
 
-Step 1 — Extract the action direction from the ground truth. It will be one of:
+Step 1 - Extract the action direction from the ground truth. It will be one of:
   A) investigate product quality and supplier manufacturing issues
   B) audit logistics and delivery operations
   C) review fulfillment and packaging processes
   D) monitor issue trend and investigate further
 
-Step 2 — Check if the predicted Recommended Actions section points toward the same direction (A/B/C/D).
+Step 2 - Check if the predicted Recommended Actions section points toward the same direction (A/B/C/D).
 
-Step 3 — Check if the predicted main issue matches the ground truth main issue in meaning.
+Step 3 - Check if the predicted main issue matches the ground truth main issue in meaning.
 
-Step 4 — Score on a continuous 0.0–1.0 scale:
+Step 4 - Score on a continuous 0.0–1.0 scale:
 - 0.85–1.0: main issue clearly matches AND action direction is the same (A=A, B=B, etc.)
 - 0.65–0.84: main issue matches but action direction is adjacent (e.g. quality vs fulfillment)
 - 0.40–0.64: main issue partially matches (same complaint domain but different focus)
@@ -262,7 +262,7 @@ Step 4 — Score on a continuous 0.0–1.0 scale:
 - 0.0–0.14: different main issue entirely
 
 Do NOT anchor at 0.8. Reason through each step explicitly and arrive at a specific score.
-Use decimals — scores like 0.72, 0.85, 0.55 are expected and correct.
+Use decimals - scores like 0.72, 0.85, 0.55 are expected and correct.
 
 Return only valid JSON: {{"score": 0.0}}"""
 
@@ -290,7 +290,7 @@ def judge_faithfulness(
 ) -> float:
     """
     Score 0.0–1.0: Is the pipeline answer grounded in the retrieved evidence?
-    Per RAGalyst paper: measures hallucination — are claims in the answer supported
+    Per RAGalyst paper: measures hallucination - are claims in the answer supported
     by the evidence, or does the answer introduce facts not present in the context?
     1.0 = all claims supported | 0.0 = answer contradicts or ignores the evidence.
     """

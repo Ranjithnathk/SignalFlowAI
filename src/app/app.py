@@ -5,6 +5,7 @@ import re
 import sys
 from pathlib import Path
 
+import html as html_lib
 import pandas as pd
 import streamlit as st
 
@@ -33,6 +34,20 @@ COMPLAINT_TYPES = [
 ]
 
 CATEGORIES = ["Any", "electronics", "home_kitchen"]
+
+_LABEL_MAP = {
+    "Any": "Any",
+    "electronics": "Electronics",
+    "home_kitchen": "Home & Kitchen",
+    "damage_defect": "Damage / Defect",
+    "missing_parts": "Missing Parts",
+    "delivery_issue": "Delivery Issue",
+    "wrong_item": "Wrong Item",
+    "quality_issue": "Quality Issue",
+}
+
+def _fmt(val: str) -> str:
+    return _LABEL_MAP.get(val, val.replace("_", " ").title())
 
 # Sample queries keyed by (category, complaint_type).
 # Falls back to ("Any", "Any") when no specific entry exists.
@@ -492,6 +507,7 @@ def _render_product_health_tab(category: str, complaint_type: str) -> None:
         try:
             ct_df = _query_complaint_type_dist(category)
             if not ct_df.empty:
+                ct_df["complaint_type"] = ct_df["complaint_type"].map(_fmt)
                 st.bar_chart(ct_df.set_index("complaint_type")[["complaint_count"]], use_container_width=True)
                 st.caption("Complaint volume across the 5 defined complaint types.")
         except Exception as e:
@@ -503,18 +519,19 @@ def _render_product_health_tab(category: str, complaint_type: str) -> None:
             try:
                 cat_df = _query_category_dist()
                 if not cat_df.empty:
+                    cat_df["category"] = cat_df["category"].map(_fmt)
                     st.bar_chart(cat_df.set_index("category")[["complaint_count"]], use_container_width=True)
                     st.caption("Complaint volume split by category.")
             except Exception as e:
                 st.error(str(e))
         else:
-            lbl = f"`{complaint_type}`" if complaint_type != "Any" else "all types"
+            lbl = _fmt(complaint_type) if complaint_type != "Any" else "all types"
             st.markdown(f"#### Sub-categories — {lbl}")
             try:
                 sub_df = _query_subcategory_dist(category, complaint_type)
                 if not sub_df.empty:
                     st.bar_chart(sub_df.set_index("complaint_subtype")[["complaint_count"]], use_container_width=True)
-                    st.caption(f"Top complaint sub-types in `{category}`.")
+                    st.caption(f"Top complaint sub-types in {_fmt(category)}.")
                 else:
                     st.info("No sub-category data for this selection.")
             except Exception as e:
@@ -531,6 +548,7 @@ def _render_product_health_tab(category: str, complaint_type: str) -> None:
         if not top_df.empty:
             display = top_df.copy()
             display.columns = ["Brand", "Category", "Complaints", "Products Affected", "Avg Signal Score"]
+            display["Category"] = display["Category"].map(_fmt)
             st.dataframe(display, use_container_width=True, hide_index=True)
         else:
             st.info("No brand data for this selection.")
@@ -544,16 +562,18 @@ def _render_product_health_tab(category: str, complaint_type: str) -> None:
     # -----------------------------------------------------------------------
     lbl = ""
     if category != "Any":
-        lbl += f" in `{category}`"
+        lbl += f" in {_fmt(category)}"
     if complaint_type != "Any":
-        lbl += f" — `{complaint_type}`"
+        lbl += f" — {_fmt(complaint_type)}"
 
     st.markdown(f"#### Top 10 Most Complained Products{lbl}")
     try:
         prod_df = _query_top_products(category, complaint_type, limit=10)
         if not prod_df.empty:
             display_p = prod_df.copy()
-            display_p.columns = ["Product", "ASIN", "Brand", "Category", "Complaints", "Complaint Types"]
+            display_p.columns = ["Product", "Product ID", "Brand", "Category", "Complaints", "Complaint Types"]
+            display_p["Product"] = display_p["Product"].apply(html_lib.unescape)
+            display_p["Category"] = display_p["Category"].map(_fmt)
             st.dataframe(display_p, use_container_width=True, hide_index=True)
         else:
             st.info("No product data for this selection.")
@@ -595,12 +615,15 @@ def _render_product_health_tab(category: str, complaint_type: str) -> None:
         .sort_values("complaint_count", ascending=False)
     )
     st.markdown(f"**Complaint type breakdown for '{brand_filter}'**")
+    brand_ct["complaint_type"] = brand_ct["complaint_type"].map(_fmt)
     st.bar_chart(brand_ct.set_index("complaint_type")[["complaint_count"]], use_container_width=True)
 
     # Products table
     st.markdown(f"**Products under '{brand_filter}'** — top {len(bp_df)} by complaint count")
     display = bp_df.copy()
-    display.columns = ["Product", "ASIN", "Complaint Type", "Complaint Count"]
+    display.columns = ["Product", "Product ID", "Complaint Type", "Complaint Count"]
+    display["Product"] = display["Product"].apply(html_lib.unescape)
+    display["Complaint Type"] = display["Complaint Type"].map(_fmt)
     st.dataframe(display, use_container_width=True, hide_index=True)
 
 
@@ -632,9 +655,9 @@ def _render_decision_tab(selected_category: str, selected_complaint: str, top_k:
     # Active filter indicator — always visible so user knows what's applied
     _filter_parts = []
     if selected_category != "Any":
-        _filter_parts.append(f"Category: **{selected_category}**")
+        _filter_parts.append(f"Category: **{_fmt(selected_category)}**")
     if selected_complaint != "Any":
-        _filter_parts.append(f"Type: **{selected_complaint}**")
+        _filter_parts.append(f"Type: **{_fmt(selected_complaint)}**")
     _filter_parts.append(f"Top **{top_k}** complaints")
     st.caption("Filters active — " + " | ".join(_filter_parts) if len(_filter_parts) > 1
                else "No category/type filters — searching across all data | Top **{}** complaints".format(top_k))
@@ -745,6 +768,93 @@ def main() -> None:
         layout="wide",
     )
 
+    st.markdown("""
+    <style>
+    /* Metric cards */
+    div[data-testid="metric-container"] {
+        background: linear-gradient(135deg, #0d1f3c 0%, #1a2f52 100%);
+        border: 1px solid #29B5E8;
+        border-radius: 12px;
+        padding: 14px 18px;
+    }
+    div[data-testid="metric-container"] label {
+        color: #29B5E8 !important;
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+    }
+    div[data-testid="stMetricValue"] {
+        color: #ffffff !important;
+        font-size: 1.7rem;
+        font-weight: 800;
+    }
+
+    /* Sidebar */
+    section[data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #050d1a 0%, #0d1a30 100%);
+        border-right: 2px solid #29B5E8;
+    }
+    section[data-testid="stSidebar"] h2 {
+        color: #29B5E8 !important;
+        font-size: 0.85rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+
+    /* Primary button */
+    .stButton > button[kind="primary"] {
+        background: linear-gradient(90deg, #0060A9 0%, #29B5E8 100%);
+        border: none;
+        border-radius: 8px;
+        font-weight: 700;
+        font-size: 0.95rem;
+        letter-spacing: 0.04em;
+        padding: 10px 0;
+        transition: opacity 0.18s ease;
+    }
+    .stButton > button[kind="primary"]:hover { opacity: 0.85; }
+
+    /* Sample query buttons */
+    .stButton > button[kind="secondary"] {
+        border: 1px solid #29B5E8;
+        border-radius: 8px;
+        color: #29B5E8;
+        background: transparent;
+        font-size: 0.82rem;
+        transition: background 0.15s ease;
+    }
+    .stButton > button[kind="secondary"]:hover {
+        background: rgba(41,181,232,0.12);
+    }
+
+    /* Bordered containers (decision intelligence cards) */
+    div[data-testid="stVerticalBlockBorderWrapper"] {
+        border-color: #1e3a5f !important;
+        border-radius: 14px !important;
+        background: linear-gradient(135deg, #080f1e 0%, #0d1a30 100%);
+        padding: 4px;
+    }
+
+    /* Tab bar */
+    div[data-testid="stTabs"] button[data-baseweb="tab"] {
+        font-weight: 600;
+        font-size: 0.95rem;
+        color: #8b9ab5;
+    }
+    div[data-testid="stTabs"] button[data-baseweb="tab"][aria-selected="true"] {
+        color: #29B5E8 !important;
+        border-bottom-color: #29B5E8 !important;
+    }
+
+    /* Section headings h4 */
+    h4 { color: #c9d6e8; }
+
+    /* Divider */
+    hr { border-color: #1e2d45 !important; }
+    </style>
+    """, unsafe_allow_html=True)
+
     # Header
     st.markdown(
         """
@@ -761,8 +871,8 @@ def main() -> None:
     with st.sidebar:
         st.header("Filters (optional)")
         st.caption("Narrow retrieval to a specific category or complaint type.")
-        selected_category = st.selectbox("Category", CATEGORIES)
-        selected_complaint = st.selectbox("Complaint Type", COMPLAINT_TYPES)
+        selected_category = st.selectbox("Category", CATEGORIES, format_func=_fmt)
+        selected_complaint = st.selectbox("Complaint Type", COMPLAINT_TYPES, format_func=_fmt)
 
         st.divider()
         st.header("Retrieval")

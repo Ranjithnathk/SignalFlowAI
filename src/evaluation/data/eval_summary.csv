@@ -1,0 +1,2 @@
+total_questions,evaluated,failed,avg_retrieval_relevance,avg_answerability,avg_answer_correctness,avg_faithfulness,judge_model,pipeline_model,retrieval_backend
+10,10,0,0.94,1.0,0.863,0.82,llama-3.3-70b-versatile (Groq),GPT-4o (reasoning) + GPT-4o-mini (query/retrieval/verifier),Snowflake Cortex Search (snowflake-arctic-embed-l-v2.0)

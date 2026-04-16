@@ -1,0 +1,32 @@
+name: 'signalflowai_dbt'
+version: '1.0.0'
+
+# This setting configures which "profile" dbt uses for this project.
+profile: 'signalflowai_dbt'
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+clean-targets:         
+  - "target"
+  - "dbt_packages"
+
+
+# Configuring models
+
+models:
+  signalflowai_dbt:
+    clean:
+      +schema: CLEAN
+      +materialized: table
+    curated:
+      +schema: CURATED
+      +materialized: table
+    rag:
+      +schema: RAG
+      +materialized: table
+

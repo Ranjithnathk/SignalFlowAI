@@ -2,10 +2,26 @@ boto3
 botocore
 requests
 pyyaml
+numpy
 pandas
 pyarrow
 s3fs
 python-dotenv
 tqdm
-dbt-snowflake
 cryptography
+snowflake-connector-python
+langchain
+langgraph
+
+# MCP
+mcp[cli]
+
+#RAGalyst
+sentence-transformers
+faiss-cpu
+rank-bm25
+scikit-learn
+streamlit
+google-genai
+openai
+einops

@@ -1,0 +1,31 @@
+question_id,question,ground_truth_answer,ground_truth_doc_ids,category,complaint_type
+q_1,What are the common hard defect issues reported in electronics products?,"Main issue: A significant number of electronics products are experiencing hard defects, leading to failures shortly after purchase.
+Affected scope: Various electronics including binoculars, sound cards, radios, and headphones across multiple brands.
+Recommended action: investigate product quality and supplier manufacturing issues.",doc_id_385292|doc_id_513588|doc_id_308102,electronics,damage_defect
+q_2,What are the common issues related to missing parts in electronics products?,"Main issue: A significant number of complaints indicate missing accessory parts that are crucial for product functionality and installation.
+Affected scope: Various electronics products across multiple brands, particularly those requiring additional components for operation.
+Recommended action: review fulfillment and packaging processes.",204359|389976|392060,electronics,missing_parts
+q_3,What are the common delivery issues reported in electronics products?,"Main issue: A significant number of complaints indicate that customers are not receiving their electronics products as expected.
+Affected scope: electronics product group across various brands.
+Recommended action: audit logistics and delivery operations.",417616|51459|53955,electronics,delivery_issue
+q_4,What are the common issues related to receiving wrong items in the electronics category?,"Main issue: A significant number of complaints indicate that customers frequently receive incorrect items or items that do not match their orders.
+Affected scope: General wrong item complaints across various electronics brands.
+Recommended action: review fulfillment and packaging processes.",361296|578222|580361,electronics,wrong_item
+q_5,What are the recurring quality issues reported across electronics products?,"Main issue: The predominant complaint across various electronics products is poor build quality, with customers expressing dissatisfaction regarding durability and functionality.
+Affected scope: electronics product group, particularly accessories and peripherals.
+Recommended action: investigate product quality and supplier manufacturing issues.",154498|154691|154645,electronics,quality_issue
+q_6,What are the common patterns of damage defects reported in home kitchen products?,"Main issue: A significant number of complaints indicate hard defects and general damage defects, particularly related to the quality and durability of materials used in home kitchen products.
+Affected scope: Products across various brands in the home kitchen category, especially those with hard defects like cookware, utensils, and storage solutions.
+Recommended action: investigate product quality and supplier manufacturing issues.",98316|723050|98357,home_kitchen,damage_defect
+q_7,What are the common issues related to missing parts in home kitchen products?,"Main issue: A significant number of complaints indicate missing core parts and accessories across various home kitchen products.
+Affected scope: core_parts_missing and accessory_missing subtypes across multiple brands.
+Recommended action: investigate product quality and supplier manufacturing issues.",54588|611127|792884,home_kitchen,missing_parts
+q_8,What are the most common delivery issues reported in home kitchen products?,"Main issue: A significant number of complaints indicate that customers are not receiving their orders or specific parts of their orders. 
+Affected scope: Home kitchen products across various brands, particularly those with complex items requiring multiple components. 
+Recommended action: audit logistics and delivery operations.",588379|581174|585351,home_kitchen,delivery_issue
+q_9,What are the common issues related to wrong items received in home kitchen products?,"Main issue: Customers frequently report receiving items that do not match their expectations or descriptions, leading to dissatisfaction.
+Affected scope: Products across various brands in the home kitchen category, particularly those with misleading representations.
+Recommended action: monitor issue trend and investigate further.",289042|290132|290078,home_kitchen,wrong_item
+q_10,What are the common quality issues reported across home kitchen products?,"Main issue: Recurring complaints about poor build quality across various home kitchen products.
+Affected scope: Home kitchen product group, including brands like Oreck, Rubbermaid, and Vitamix.
+Recommended action: Investigate product quality and supplier manufacturing issues.",154500|308158|308125,home_kitchen,quality_issue

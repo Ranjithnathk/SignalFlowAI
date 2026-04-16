@@ -1,0 +1,30 @@
+# Secrets & credentials
+.env
+*.p8
+*.pem
+*.pub
+snowflake_rsa_key*
+**/profiles.yml
+
+# Personal reference files (not project code)
+demo.md
+doubts.md
+poster_content.md
+
+# Reference / scratch files
+RAGalyst/
+test.py
+test_phase*.py
+test_langgraph_agents.py
+
+# Python cache
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+
+# Environment & logs
+.venv/
+logs/
+*.log
+.DS_Store

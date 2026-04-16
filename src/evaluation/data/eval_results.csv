@@ -1,0 +1,11 @@
+question_id,question,category,complaint_type,retrieval_relevance,answerability,answer_correctness,faithfulness,evidence_count,confidence_raw,error
+q_1,What are the common hard defect issues reported in electronics products?,electronics,damage_defect,0.9,1.0,0.85,0.8,10,High,
+q_2,What are the common issues related to missing parts in electronics products?,electronics,missing_parts,0.9,1.0,0.85,0.8,10,High,
+q_3,What are the common delivery issues reported in electronics products?,electronics,delivery_issue,0.9,1.0,0.85,0.8,10,High,
+q_4,What are the common issues related to receiving wrong items in the electronics category?,electronics,wrong_item,1.0,1.0,0.85,0.8,10,High,
+q_5,What are the recurring quality issues reported across electronics products?,electronics,quality_issue,1.0,1.0,0.95,0.8,10,High,
+q_6,What are the common patterns of damage defects reported in home kitchen products?,home_kitchen,damage_defect,1.0,1.0,0.85,0.9,10,High,
+q_7,What are the common issues related to missing parts in home kitchen products?,home_kitchen,missing_parts,1.0,1.0,0.85,0.9,10,High,
+q_8,What are the most common delivery issues reported in home kitchen products?,home_kitchen,delivery_issue,0.8,1.0,0.93,0.8,10,High,
+q_9,What are the common issues related to wrong items received in home kitchen products?,home_kitchen,wrong_item,0.9,1.0,0.72,0.8,10,High,
+q_10,What are the common quality issues reported across home kitchen products?,home_kitchen,quality_issue,1.0,1.0,0.93,0.8,10,High,

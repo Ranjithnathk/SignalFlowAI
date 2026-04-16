@@ -23,7 +23,9 @@ def _load_snowflake_private_key() -> bytes:
         with open(key_path, "rb") as f:
             pem_data = f.read()
     else:
-        pem_data = os.getenv("SNOWFLAKE_PRIVATE_KEY_CONTENT", "").encode()
+        raw = os.getenv("SNOWFLAKE_PRIVATE_KEY_CONTENT", "")
+        raw = raw.replace("\\n", "\n").strip()
+        pem_data = raw.encode()
 
     pk = load_pem_private_key(pem_data, password=passphrase_bytes)
     return pk.private_bytes(Encoding.DER, PrivateFormat.PKCS8, NoEncryption())

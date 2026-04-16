@@ -7,7 +7,13 @@ from src.retrieval.snowflake_retriever import SnowflakeRetriever
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-retriever = SnowflakeRetriever()
+_retriever = None
+
+def _get_retriever():
+    global _retriever
+    if _retriever is None:
+        _retriever = SnowflakeRetriever()
+    return _retriever
 
 RETRIEVAL_AGENT_PROMPT = """
 You are Retrieval Agent for SignalFlowAI.
@@ -41,7 +47,7 @@ def retrieval_agent_node(state):
     filters = _normalize_filters(state.get("filters"))
     top_k = state.get("top_k", 10)
 
-    results = retriever.retrieve(query=query, top_k=top_k, filters=filters)
+    results = _get_retriever().retrieve(query=query, top_k=top_k, filters=filters)
 
     evidence_preview = []
     for r in results:

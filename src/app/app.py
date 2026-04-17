@@ -499,7 +499,7 @@ def _query_complaints(
             asin,
             brand,
             complaint_type,
-            COALESCE(complaint_subtype, '—')            AS complaint_subtype,
+            COALESCE(complaint_subtype, '-')            AS complaint_subtype,
             COUNT(*)                                    AS complaint_count,
             ROUND(AVG(signal_score), 2)                 AS avg_signal_score,
             MIN(review_date)                            AS earliest_review,
@@ -606,7 +606,7 @@ def _render_product_health_tab(category: str, complaint_type: str) -> None:
                         y="complaint_count",
                         color="complaint_subtype",
                         color_discrete_sequence=CHART_COLORS,
-                        title=f"Sub-categories — {lbl}",
+                        title=f"Sub-categories - {lbl}",
                         labels={"complaint_count": "Complaints", "complaint_subtype": ""},
                     )
                     fig3.update_layout(
@@ -694,7 +694,7 @@ def _render_product_health_tab(category: str, complaint_type: str) -> None:
             value=50,
             step=50,
             key="row_limit",
-            help="How many rows to return. Enter any number — if fewer rows exist, all available data is returned.",
+            help="How many rows to return. Enter any number - if fewer rows exist, all available data is returned.",
         )
 
     has_brand = bool(brand_filter.strip())
@@ -735,7 +735,7 @@ def _render_product_health_tab(category: str, complaint_type: str) -> None:
                 ct_agg, x="complaint_type", y="complaint_count",
                 color="complaint_type",
                 color_discrete_sequence=CHART_COLORS,
-                title=f"Complaint Breakdown — {search_label.title()}",
+                title=f"Complaint Breakdown - {search_label.title()}",
                 labels={"complaint_count": "Complaints", "complaint_type": ""},
             )
             fig_s.update_layout(
@@ -755,9 +755,9 @@ def _render_product_health_tab(category: str, complaint_type: str) -> None:
             display_s["Complaint Subtype"] = display_s["Complaint Subtype"].str.replace("_", " ").str.title()
             actual = len(display_s)
             if actual < int(row_limit):
-                st.caption(f"Showing {actual:,} rows — all available data for this search (fewer than the {int(row_limit):,} requested)")
+                st.caption(f"Showing {actual:,} rows - all available data for this search (fewer than the {int(row_limit):,} requested)")
             else:
-                st.caption(f"Showing {actual:,} rows — increase Max Rows to retrieve more")
+                st.caption(f"Showing {actual:,} rows - increase Max Rows to retrieve more")
             st.dataframe(_style_df(display_s), use_container_width=True)
 
             fname = (
@@ -819,13 +819,13 @@ def _render_decision_tab(selected_category: str, selected_complaint: str, top_k:
     # Build any sidebar filters
     sidebar_filters = _build_filters(selected_category, selected_complaint)
 
-    # Run the LangGraph pipeline — timed
+    # Run the LangGraph pipeline - timed
     graph = get_graph()
     initial_state = {"user_query": query, "top_k": top_k}
     if sidebar_filters:
         initial_state["filters"] = sidebar_filters
 
-    with st.spinner("Running 4-agent pipeline — Query → Retrieval → Reasoning → Verification…"):
+    with st.spinner("Running 4-agent pipeline - Query → Retrieval → Reasoning → Verification…"):
         try:
             result = graph.invoke(initial_state)
         except Exception as exc:
@@ -913,7 +913,7 @@ def main() -> None:
 
     st.markdown("""
     <style>
-    /* Metric cards — border accent only, works in light + dark */
+    /* Metric cards - border accent only, works in light + dark */
     div[data-testid="metric-container"] {
         border: 1px solid #29B5E8;
         border-radius: 12px;
@@ -931,7 +931,7 @@ def main() -> None:
         font-weight: 800;
     }
 
-    /* Sidebar — accent border only */
+    /* Sidebar - accent border only */
     section[data-testid="stSidebar"] {
         border-right: 2px solid #29B5E8;
     }
@@ -969,13 +969,13 @@ def main() -> None:
         background: rgba(41,181,232,0.12);
     }
 
-    /* Bordered containers — accent border, no forced background */
+    /* Bordered containers - accent border, no forced background */
     div[data-testid="stVerticalBlockBorderWrapper"] {
         border-color: #29B5E8 !important;
         border-radius: 14px !important;
     }
 
-    /* Tab bar — colorful outlined tabs */
+    /* Tab bar - colorful outlined tabs */
     div[data-testid="stTabs"] {
         border-bottom: none !important;
     }
@@ -1011,7 +1011,7 @@ def main() -> None:
     </style>
     """, unsafe_allow_html=True)
 
-    # ── Sidebar — filters + retrieval + query history ──────────────────────────
+    # ── Sidebar - filters + retrieval + query history ──────────────────────────
     with st.sidebar:
         st.markdown(
             "<div style='"
@@ -1032,7 +1032,7 @@ def main() -> None:
         selected_category = st.selectbox("Category", CATEGORIES, format_func=_fmt)
         selected_complaint = st.selectbox("Complaint Type", COMPLAINT_TYPES, format_func=_fmt)
 
-        # Active filter summary — below the filter boxes
+        # Active filter summary - below the filter boxes
         _fp = []
         if selected_category != "Any":
             _fp.append(f"**{_fmt(selected_category)}**")
@@ -1041,7 +1041,7 @@ def main() -> None:
         if _fp:
             st.caption("Active filters: " + " · ".join(_fp))
         else:
-            st.caption("No filters — searching all data")
+            st.caption("No filters - searching all data")
 
         st.header("Retrieval")
         top_k = st.slider(
@@ -1050,7 +1050,7 @@ def main() -> None:
             max_value=50,
             value=50,
             step=10,
-            help="Number of complaints Cortex Search retrieves — ranked by semantic similarity.",
+            help="Number of complaints Cortex Search retrieves - ranked by semantic similarity.",
         )
 
         with st.expander("Recent Queries"):
@@ -1061,7 +1061,7 @@ def main() -> None:
             else:
                 st.caption("No queries yet this session.")
 
-    # ── Navigation tabs (sticky in Streamlit — stays pinned while scrolling) ──
+    # ── Navigation tabs (sticky in Streamlit - stays pinned while scrolling) ──
     tab1, tab2 = st.tabs(["⚡  Decision Intelligence", "📊  Product Health"])
     with tab1:
         _render_decision_tab(selected_category, selected_complaint, top_k)

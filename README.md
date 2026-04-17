@@ -1,8 +1,8 @@
 # SignalFlowAI
 
-**Operational Decision Intelligence — powered by Snowflake Cortex Search + LangGraph Agents**
+**Operational Decision Intelligence - powered by Snowflake Cortex Search + LangGraph Agents**
 
-SignalFlowAI transforms 43 million Amazon customer reviews into structured, evidence-backed operational intelligence. It detects recurring product failures, delivery breakdowns, and quality issues at scale — and surfaces actionable decision briefs through a multi-agent reasoning pipeline.
+SignalFlowAI transforms 43 million Amazon customer reviews into structured, evidence-backed operational intelligence. It detects recurring product failures, delivery breakdowns, and quality issues at scale - and surfaces actionable decision briefs through a multi-agent reasoning pipeline.
 
 > Live app: [signalflowai.streamlit.app](https://signalflowai.streamlit.app)
 
@@ -19,53 +19,13 @@ Given a natural language query like *"What defects are recurring in electronics 
 3. Synthesizes a 5-section decision brief: Issue Summary, Recurring Pattern, Root Cause, Business Impact, Recommended Actions
 4. Verifies the output against retrieved evidence and assigns a confidence level
 
-Every output is grounded in real customer complaints — no hallucination, full traceability.
+Every output is grounded in real customer complaints - no hallucination, full traceability.
 
 ---
 
 ## Architecture
 
-```
-UCSD Amazon Dataset (43M reviews)
-        │
-        ▼
-Python Scripts → AWS S3 (Parquet)
-        │
-        ▼  COPY INTO
-┌─────────────────────────────────────────────────┐
-│              SNOWFLAKE                          │
-│                                                 │
-│  RAW layer (43M reviews + 2M metadata)          │
-│      ↓  dbt CLEAN                               │
-│  Standardized text, complaint flags             │
-│      ↓  dbt CURATED                             │
-│  Signal scoring → 43M filtered to 828K          │
-│      ↓  dbt RAG                                 │
-│  RAG.REVIEW_DOCUMENTS (retrieval_text field)    │
-│      ↓                                          │
-│  Cortex Search (arctic-embed-l-v2.0)            │
-│  828K documents indexed, sub-second retrieval   │
-└───────────────────────────┬─────────────────────┘
-                            │ top-K complaints
-                            ▼
-        ┌───────────────────────────────────────┐
-        │       LangGraph StateGraph            │
-        │                                       │
-        │  Query Agent      (GPT-4o-mini)       │
-        │       ↓                               │
-        │  Retrieval Agent  (GPT-4o-mini)       │
-        │       ↓                               │
-        │  Reasoning Agent  (GPT-4o)            │
-        │       ↓                               │
-        │  Verifier Agent   (GPT-4o-mini)       │
-        └───────────────────┬───────────────────┘
-                            │
-                            ▼
-        Streamlit Decision Interface
-        (Streamlit Community Cloud)
-```
-
-![Architecture Diagram](images/SignalFlow_Architecture_Diagram.png)
+![Architecture Diagram](images/SignalFlowAI_architecture.png)
 
 ---
 
@@ -73,7 +33,7 @@ Python Scripts → AWS S3 (Parquet)
 
 | Layer | Technology |
 |---|---|
-| Data Source | UCSD Amazon Reviews Dataset (2023) |
+| Data Source | UCSD Amazon Reviews Dataset (2018) |
 | Data Lake | AWS S3 (Parquet, Hive-partitioned) |
 | Data Warehouse | Snowflake |
 | Transformation | dbt (3-layer: CLEAN → CURATED → RAG) |
@@ -100,10 +60,10 @@ Reviews earn a score from 0–4 based on four signals. Only reviews scoring ≥ 
 
 | Signal | Condition | Points |
 |---|---|---|
-| Severity | Overall rating ≤ 2 stars | +1 |
+| Severity | Overall rating <= 2 | +1 |
 | Verified | Verified purchase | +1 |
-| Community | Helpfulness votes ≥ 1 | +1 |
-| Detail | Review length ≥ category median | +1 |
+| Community | Helpfulness votes => 1 | +1 |
+| Detail | Review length => category median | +1 |
 
 ### Evaluation (RAGalyst Framework, 10 questions)
 
@@ -323,7 +283,7 @@ Three focused DAGs manage the pipeline lifecycle:
 | `signalflowai_etl` | Daily @ 3 AM | S3 → Snowflake RAW → dbt → Cortex Search refresh |
 | `signalflowai_eval` | Weekly, Mondays @ 4 AM | Benchmark Q&A generation + RAGalyst scoring |
 
-The ETL DAG uses a `ShortCircuitOperator` at Task 0 — it checks for new S3 data before running anything. No new data means the entire DAG is skipped, keeping compute costs at zero on quiet days.
+The ETL DAG uses a `ShortCircuitOperator` at Task 0 - it checks for new S3 data before running anything. No new data means the entire DAG is skipped, keeping compute costs at zero on quiet days.
 
 ---
 
@@ -356,7 +316,7 @@ Results are written to `src/evaluation/data/eval_details.csv`.
 
 ## Dataset
 
-**UCSD Amazon Reviews 2023** — [McAuley Lab](https://cseweb.ucsd.edu/~jmcauley/datasets/amazon_v2/)
+**UCSD Amazon Reviews 2018** - [McAuley Lab](https://cseweb.ucsd.edu/~jmcauley/datasets/amazon_v2/)
 
 - Categories used: Electronics, Home & Kitchen
 - Raw reviews: ~43 million
@@ -367,4 +327,4 @@ Results are written to `src/evaluation/data/eval_details.csv`.
 
 ## License
 
-This project was developed as part of a graduate data engineering course. Dataset usage follows UCSD Amazon Reviews 2023 terms.
+This project was developed as part of a graduate data engineering course. Dataset usage follows UCSD Amazon Reviews 2018 terms.

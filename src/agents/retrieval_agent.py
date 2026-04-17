@@ -42,12 +42,25 @@ def _normalize_filters(filters):
         return filters
     return None
 
+def _is_auth_error(e: Exception) -> bool:
+    msg = str(e)
+    return "390114" in msg or "token has expired" in msg.lower() or "must authenticate again" in msg.lower()
+
+
 def retrieval_agent_node(state):
+    global _retriever
     query = state["user_query"]
     filters = _normalize_filters(state.get("filters"))
     top_k = state.get("top_k", 10)
 
-    results = _get_retriever().retrieve(query=query, top_k=top_k, filters=filters)
+    try:
+        results = _get_retriever().retrieve(query=query, top_k=top_k, filters=filters)
+    except Exception as e:
+        if _is_auth_error(e):
+            _retriever = None  # force a fresh connection on next call
+            results = _get_retriever().retrieve(query=query, top_k=top_k, filters=filters)
+        else:
+            raise
 
     evidence_preview = []
     for r in results:

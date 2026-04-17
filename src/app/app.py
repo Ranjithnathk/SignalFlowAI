@@ -296,7 +296,7 @@ def _load_snowflake_private_key() -> bytes:
     return pk.private_bytes(Encoding.DER, PrivateFormat.PKCS8, NoEncryption())
 
 
-@st.cache_resource
+@st.cache_resource(ttl=1800)
 def _get_snowflake_conn():
     import snowflake.connector
     return snowflake.connector.connect(

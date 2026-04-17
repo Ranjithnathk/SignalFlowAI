@@ -989,7 +989,21 @@ def main() -> None:
 
     # ── Sidebar — filters + retrieval + query history ──────────────────────────
     with st.sidebar:
-        st.divider()
+        st.markdown(
+            "<div style='"
+            "background:rgba(14,17,23,0.98);"
+            "border-bottom:2px solid #29B5E8;"
+            "box-shadow:0 2px 8px rgba(0,0,0,0.3);"
+            "border-radius:8px;"
+            "padding:14px 16px;margin-bottom:12px;"
+            "'>"
+            "<div style='font-size:1.6rem;font-weight:900;color:#29B5E8;"
+            "letter-spacing:-0.4px;line-height:1.15;'>⚡ SignalFlowAI</div>"
+            "<div style='font-size:0.78rem;color:#aaa;margin-top:2px;'>"
+            "Operational Decision Intelligence</div>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
         st.header("Filters")
         selected_category = st.selectbox("Category", CATEGORIES, format_func=_fmt)
         selected_complaint = st.selectbox("Complaint Type", COMPLAINT_TYPES, format_func=_fmt)
@@ -1005,7 +1019,6 @@ def main() -> None:
         else:
             st.caption("No filters — searching all data")
 
-        st.divider()
         st.header("Retrieval")
         top_k = st.slider(
             "Top complaints to retrieve",
@@ -1016,7 +1029,6 @@ def main() -> None:
             help="Number of complaints Cortex Search retrieves — ranked by semantic similarity.",
         )
 
-        st.divider()
         with st.expander("Recent Queries"):
             history = st.session_state.get("query_history", [])
             if history:
@@ -1038,9 +1050,10 @@ def main() -> None:
         "border-radius:8px;"
         "padding:12px 24px;margin-bottom:4px;"
         "display:flex;align-items:center;gap:14px;'>"
-        "<span style='font-size:2.1rem;font-weight:900;color:#29B5E8;"
-        "letter-spacing:-0.5px;line-height:1.1;'>⚡ SignalFlowAI</span>"
-        "<span style='font-size:0.8rem;color:#aaa;'>Operational Decision Intelligence</span>"
+        "<span style='font-size:2.8rem;font-weight:900;color:#29B5E8;"
+        "letter-spacing:-1px;line-height:1.1;'>⚡ SignalFlowAI</span>"
+        "<span style='font-size:1rem;color:#aaa;font-style:italic;'>"
+        "Operational Decision Intelligence</span>"
         "</div>",
         unsafe_allow_html=True,
     )

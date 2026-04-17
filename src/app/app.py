@@ -50,6 +50,28 @@ _LABEL_MAP = {
 def _fmt(val: str) -> str:
     return _LABEL_MAP.get(val, val.replace("_", " ").title())
 
+# 3-color professional palette used across all charts
+CHART_COLORS = ["#29B5E8", "#E8903E", "#3D9970"]
+
+
+def _style_df(df: pd.DataFrame):
+    """Apply accent-colored headers to a dataframe for display."""
+    return (
+        df.style
+        .set_table_styles([{
+            "selector": "thead th",
+            "props": [
+                ("background-color", "#29B5E8"),
+                ("color", "white"),
+                ("font-weight", "600"),
+                ("font-size", "0.78rem"),
+                ("text-transform", "uppercase"),
+                ("letter-spacing", "0.05em"),
+            ],
+        }])
+        .hide(axis="index")
+    )
+
 # Sample queries keyed by (category, complaint_type).
 # Falls back to ("Any", "Any") when no specific entry exists.
 _SAMPLE_QUERIES_MAP: dict[tuple[str, str], list[str]] = {
@@ -468,6 +490,32 @@ def _query_brand_products(category: str, brand_filter: str) -> pd.DataFrame:
     """, params)
 
 
+@st.cache_data(ttl=600)
+def _query_product_details(category: str, product_filter: str) -> pd.DataFrame:
+    """Products matching a partial title search with complaint breakdown."""
+    params: list = [f"%{product_filter.strip().lower()}%"]
+    extra = ""
+    if category and category != "Any":
+        extra = "AND LOWER(category) = %s"
+        params.append(category.lower())
+
+    return _run_query(f"""
+        SELECT
+            COALESCE(NULLIF(TRIM(title), ''), 'Untitled Product') AS product,
+            asin,
+            brand,
+            complaint_type,
+            COUNT(*) AS complaint_count
+        FROM RAG.REVIEW_DOCUMENTS
+        WHERE complaint_type IN ({_TYPES_IN})
+          AND LOWER(title) LIKE %s
+        {extra}
+        GROUP BY title, asin, brand, complaint_type
+        ORDER BY complaint_count DESC
+        LIMIT 50
+    """, params)
+
+
 # ---------------------------------------------------------------------------
 # Analytics Dashboard - render
 # ---------------------------------------------------------------------------
@@ -499,7 +547,6 @@ def _render_product_health_tab(category: str, complaint_type: str) -> None:
     col_left, col_right = st.columns(2)
 
     with col_left:
-        st.markdown("#### Complaints by Type")
         try:
             ct_df = _query_complaint_type_dist(category)
             if not ct_df.empty:
@@ -508,35 +555,71 @@ def _render_product_health_tab(category: str, complaint_type: str) -> None:
                     ct_df,
                     names="complaint_type",
                     values="complaint_count",
-                    color_discrete_sequence=px.colors.qualitative.Bold,
-                    hole=0.35,
+                    color_discrete_sequence=CHART_COLORS,
+                    hole=0.38,
+                    title="Complaints by Type",
                 )
-                fig.update_traces(textposition="inside", textinfo="percent+label")
-                fig.update_layout(margin=dict(t=10, b=10, l=10, r=10), showlegend=False)
+                fig.update_traces(textposition="inside", textinfo="percent+label", textfont_size=11)
+                fig.update_layout(
+                    title_x=0.5,
+                    title_font_size=14,
+                    height=300,
+                    margin=dict(t=40, b=10, l=10, r=10),
+                    showlegend=False,
+                )
                 st.plotly_chart(fig, use_container_width=True)
-                st.caption("Complaint volume across the 5 defined complaint types")
         except Exception as e:
             st.error(str(e))
 
     with col_right:
         if category == "Any":
-            st.markdown("#### Electronics vs Home Kitchen")
             try:
                 cat_df = _query_category_dist()
                 if not cat_df.empty:
                     cat_df["category"] = cat_df["category"].map(_fmt)
-                    st.bar_chart(cat_df.set_index("category")[["complaint_count"]], use_container_width=True)
-                    st.caption("Complaint volume split by category")
+                    fig2 = px.bar(
+                        cat_df,
+                        x="category",
+                        y="complaint_count",
+                        color="category",
+                        color_discrete_sequence=CHART_COLORS,
+                        title="Electronics vs Home & Kitchen",
+                        labels={"complaint_count": "Complaints", "category": ""},
+                    )
+                    fig2.update_layout(
+                        title_x=0.5,
+                        title_font_size=14,
+                        height=300,
+                        margin=dict(t=40, b=10, l=10, r=10),
+                        showlegend=False,
+                    )
+                    st.plotly_chart(fig2, use_container_width=True)
             except Exception as e:
                 st.error(str(e))
         else:
-            lbl = _fmt(complaint_type) if complaint_type != "Any" else "all types"
-            st.markdown(f"#### Sub-categories - {lbl}")
+            lbl = _fmt(complaint_type) if complaint_type != "Any" else "All Types"
             try:
                 sub_df = _query_subcategory_dist(category, complaint_type)
                 if not sub_df.empty:
-                    st.bar_chart(sub_df.set_index("complaint_subtype")[["complaint_count"]], use_container_width=True)
-                    st.caption(f"Top complaint sub-types in {_fmt(category)}.")
+                    sub_df["complaint_subtype"] = sub_df["complaint_subtype"].str.replace("_", " ").str.title()
+                    fig3 = px.bar(
+                        sub_df,
+                        x="complaint_subtype",
+                        y="complaint_count",
+                        color="complaint_subtype",
+                        color_discrete_sequence=CHART_COLORS,
+                        title=f"Sub-categories — {lbl}",
+                        labels={"complaint_count": "Complaints", "complaint_subtype": ""},
+                    )
+                    fig3.update_layout(
+                        title_x=0.5,
+                        title_font_size=14,
+                        height=300,
+                        margin=dict(t=40, b=40, l=10, r=10),
+                        showlegend=False,
+                        xaxis_tickangle=-30,
+                    )
+                    st.plotly_chart(fig3, use_container_width=True)
                 else:
                     st.info("No sub-category data for this selection.")
             except Exception as e:
@@ -554,7 +637,7 @@ def _render_product_health_tab(category: str, complaint_type: str) -> None:
             display = top_df.copy()
             display.columns = ["Brand", "Category", "Complaints", "Products Affected", "Avg Signal Score"]
             display["Category"] = display["Category"].map(_fmt)
-            st.dataframe(display, use_container_width=True, hide_index=True)
+            st.dataframe(_style_df(display), use_container_width=True)
         else:
             st.info("No brand data for this selection.")
     except Exception as e:
@@ -579,7 +662,7 @@ def _render_product_health_tab(category: str, complaint_type: str) -> None:
             display_p.columns = ["Product", "Product ID", "Brand", "Category", "Complaints", "Complaint Types"]
             display_p["Product"] = display_p["Product"].apply(html_lib.unescape)
             display_p["Category"] = display_p["Category"].map(_fmt)
-            st.dataframe(display_p, use_container_width=True, hide_index=True)
+            st.dataframe(_style_df(display_p), use_container_width=True)
         else:
             st.info("No product data for this selection.")
     except Exception as e:
@@ -588,47 +671,118 @@ def _render_product_health_tab(category: str, complaint_type: str) -> None:
     st.divider()
 
     # -----------------------------------------------------------------------
-    # Section 5: Brand deep-dive - products list
+    # Section 5: Brand & Product search
     # -----------------------------------------------------------------------
-    st.markdown("#### Search Brand - Products & Complaints")
-    brand_filter = st.text_input("",
-        placeholder="e.g. Sony, Samsung, Instant Pot",
-        key="brand_filter",
-    )
+    search_col1, search_col2 = st.columns(2)
 
-    if not brand_filter.strip():
-        st.info("Enter a brand name to see its products and complaint breakdown.")
-        return
+    with search_col1:
+        st.markdown("#### Search by Brand")
+        brand_filter = st.text_input(
+            "",
+            placeholder="e.g. Sony, Samsung, Instant Pot",
+            key="brand_filter",
+        )
 
-    with st.spinner(f"Loading products for '{brand_filter}'…"):
-        try:
-            bp_df = _query_brand_products(category, brand_filter)
-        except Exception as e:
-            st.error(str(e))
-            return
+    with search_col2:
+        st.markdown("#### Search by Product")
+        product_filter = st.text_input(
+            "",
+            placeholder="e.g. headphones, coffee maker, USB cable",
+            key="product_filter",
+        )
 
-    if bp_df.empty:
-        st.warning(f"No products found for brand matching '{brand_filter}'.")
-        return
+    # ---- Brand results ----
+    if brand_filter.strip():
+        with st.spinner(f"Loading results for brand '{brand_filter}'…"):
+            try:
+                bp_df = _query_brand_products(category, brand_filter)
+            except Exception as e:
+                st.error(str(e))
+                bp_df = pd.DataFrame()
 
-    # Complaint type summary bar chart for this brand
-    brand_ct = (
-        bp_df.groupby("complaint_type")["complaint_count"]
-        .sum()
-        .reset_index()
-        .sort_values("complaint_count", ascending=False)
-    )
-    st.markdown(f"**Complaint type breakdown for '{brand_filter}'**")
-    brand_ct["complaint_type"] = brand_ct["complaint_type"].map(_fmt)
-    st.bar_chart(brand_ct.set_index("complaint_type")[["complaint_count"]], use_container_width=True)
+        if bp_df.empty:
+            st.warning(f"No products found for brand matching '{brand_filter}'.")
+        else:
+            brand_ct = (
+                bp_df.groupby("complaint_type")["complaint_count"]
+                .sum().reset_index()
+                .sort_values("complaint_count", ascending=False)
+            )
+            brand_ct["complaint_type"] = brand_ct["complaint_type"].map(_fmt)
+            fig_b = px.bar(
+                brand_ct, x="complaint_type", y="complaint_count",
+                color="complaint_type",
+                color_discrete_sequence=CHART_COLORS,
+                title=f"Complaint Breakdown — {brand_filter}",
+                labels={"complaint_count": "Complaints", "complaint_type": ""},
+            )
+            fig_b.update_layout(
+                title_x=0.5, title_font_size=14,
+                height=280, margin=dict(t=40, b=10, l=10, r=10),
+                showlegend=False,
+            )
+            st.plotly_chart(fig_b, use_container_width=True)
 
-    # Products table
-    st.markdown(f"**Products under '{brand_filter}'** - top {len(bp_df)} by complaint count")
-    display = bp_df.copy()
-    display.columns = ["Product", "Product ID", "Complaint Type", "Complaint Count"]
-    display["Product"] = display["Product"].apply(html_lib.unescape)
-    display["Complaint Type"] = display["Complaint Type"].map(_fmt)
-    st.dataframe(display, use_container_width=True, hide_index=True)
+            display_b = bp_df.copy()
+            display_b.columns = ["Product", "Product ID", "Complaint Type", "Complaint Count"]
+            display_b["Product"] = display_b["Product"].apply(html_lib.unescape)
+            display_b["Complaint Type"] = display_b["Complaint Type"].map(_fmt)
+            st.dataframe(_style_df(display_b), use_container_width=True)
+
+            st.download_button(
+                label="Download brand data as CSV",
+                data=display_b.to_csv(index=False).encode("utf-8"),
+                file_name=f"signalflowai_brand_{brand_filter.strip()}.csv",
+                mime="text/csv",
+            )
+
+    # ---- Product results ----
+    if product_filter.strip():
+        with st.spinner(f"Loading results for product '{product_filter}'…"):
+            try:
+                pp_df = _query_product_details(category, product_filter)
+            except Exception as e:
+                st.error(str(e))
+                pp_df = pd.DataFrame()
+
+        if pp_df.empty:
+            st.warning(f"No products found matching '{product_filter}'.")
+        else:
+            prod_ct = (
+                pp_df.groupby("complaint_type")["complaint_count"]
+                .sum().reset_index()
+                .sort_values("complaint_count", ascending=False)
+            )
+            prod_ct["complaint_type"] = prod_ct["complaint_type"].map(_fmt)
+            fig_p = px.bar(
+                prod_ct, x="complaint_type", y="complaint_count",
+                color="complaint_type",
+                color_discrete_sequence=CHART_COLORS,
+                title=f"Complaint Breakdown — \"{product_filter}\"",
+                labels={"complaint_count": "Complaints", "complaint_type": ""},
+            )
+            fig_p.update_layout(
+                title_x=0.5, title_font_size=14,
+                height=280, margin=dict(t=40, b=10, l=10, r=10),
+                showlegend=False,
+            )
+            st.plotly_chart(fig_p, use_container_width=True)
+
+            display_p2 = pp_df.copy()
+            display_p2.columns = ["Product", "Product ID", "Brand", "Complaint Type", "Complaint Count"]
+            display_p2["Product"] = display_p2["Product"].apply(html_lib.unescape)
+            display_p2["Complaint Type"] = display_p2["Complaint Type"].map(_fmt)
+            st.dataframe(_style_df(display_p2), use_container_width=True)
+
+            st.download_button(
+                label="Download product data as CSV",
+                data=display_p2.to_csv(index=False).encode("utf-8"),
+                file_name=f"signalflowai_product_{product_filter.strip()}.csv",
+                mime="text/csv",
+            )
+
+    if not brand_filter.strip() and not product_filter.strip():
+        st.info("Enter a brand name or product keyword above to explore complaints.")
 
 
 # ---------------------------------------------------------------------------
@@ -638,7 +792,7 @@ def _render_product_health_tab(category: str, complaint_type: str) -> None:
 def _render_decision_tab(selected_category: str, selected_complaint: str, top_k: int) -> None:
     # Sample query buttons - dynamic based on sidebar filters
     sample_queries = get_sample_queries(selected_category, selected_complaint)
-    st.markdown("**Quick start - try a sample query:**")
+    st.caption("Try a sample query:")
     cols = st.columns(len(sample_queries))
     for col, sample in zip(cols, sample_queries):
         if col.button(sample, use_container_width=True):
@@ -860,31 +1014,38 @@ def main() -> None:
         unsafe_allow_html=True,
     )
 
-    # Sidebar - shared across both tabs
+    # Sidebar
     with st.sidebar:
+        page = st.radio(
+            "Navigate",
+            ["Decision Intelligence", "Product Health"],
+            index=0,
+        )
+
+        st.divider()
         st.header("Filters")
         st.caption("Narrow retrieval to a specific category or complaint type")
         selected_category = st.selectbox("Category", CATEGORIES, format_func=_fmt)
         selected_complaint = st.selectbox("Complaint Type", COMPLAINT_TYPES, format_func=_fmt)
 
-        st.divider()
-        st.header("Retrieval")
-        top_k = st.slider(
-            "Top complaints to retrieve",
-            min_value=5,
-            max_value=20,
-            value=10,
-            step=5,
-            help="Cortex Search returns these many complaints ranked by semantic similarity to your query.",
-        )
+        if page == "Decision Intelligence":
+            st.divider()
+            st.header("Retrieval")
+            top_k = st.slider(
+                "Top complaints to retrieve",
+                min_value=5,
+                max_value=20,
+                value=10,
+                step=5,
+                help="Number of complaints Cortex Search retrieves — ranked by semantic similarity.",
+            )
+        else:
+            top_k = 10
 
-    # Tabs
-    tab_decision, tab_health = st.tabs(["Decision Intelligence", "Product Health"])
-
-    with tab_decision:
+    # Page routing
+    if page == "Decision Intelligence":
         _render_decision_tab(selected_category, selected_complaint, top_k)
-
-    with tab_health:
+    else:
         _render_product_health_tab(selected_category, selected_complaint)
 
 

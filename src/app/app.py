@@ -6,7 +6,6 @@ import sys
 from pathlib import Path
 
 import html as html_lib
-import time
 import pandas as pd
 import plotly.express as px
 import streamlit as st
@@ -467,43 +466,33 @@ def _query_top_products(category: str, complaint_type: str, limit: int = 10) -> 
 
 
 @st.cache_data(ttl=600)
-def _query_brand_products(category: str, brand_filter: str) -> pd.DataFrame:
-    """Products and complaint breakdown for a specific brand."""
-    params: list = [f"%{brand_filter.strip().lower()}%"]
-    extra = ""
+def _query_complaints(
+    category: str,
+    brand_filter: str,
+    product_filter: str,
+    limit: int,
+) -> pd.DataFrame:
+    """
+    Flexible complaint search.
+    - brand_filter only  → all products for that brand
+    - product_filter only → all rows matching that title keyword
+    - both               → AND condition (brand AND product)
+    - category           → additional filter when not 'Any'
+    """
+    params: list = []
+    extra_parts: list = []
+
     if category and category != "Any":
-        extra = "AND LOWER(category) = %s"
+        extra_parts.append("AND LOWER(category) = %s")
         params.append(category.lower())
+    if brand_filter:
+        extra_parts.append("AND LOWER(brand) LIKE %s")
+        params.append(f"%{brand_filter.strip().lower()}%")
+    if product_filter:
+        extra_parts.append("AND LOWER(title) LIKE %s")
+        params.append(f"%{product_filter.strip().lower()}%")
 
-    return _run_query(f"""
-        SELECT
-            COALESCE(NULLIF(TRIM(title), ''), 'Untitled Product') AS product,
-            asin,
-            complaint_type,
-            COALESCE(complaint_subtype, '—')            AS complaint_subtype,
-            COUNT(*)                                    AS complaint_count,
-            ROUND(AVG(signal_score), 2)                 AS avg_signal_score,
-            MIN(review_date)                            AS earliest_review,
-            MAX(review_date)                            AS latest_review
-        FROM RAG.REVIEW_DOCUMENTS
-        WHERE complaint_type IN ({_TYPES_IN})
-          AND LOWER(brand) LIKE %s
-        {extra}
-        GROUP BY title, asin, complaint_type, complaint_subtype
-        ORDER BY complaint_count DESC
-        LIMIT 50
-    """, params)
-
-
-@st.cache_data(ttl=600)
-def _query_product_details(category: str, product_filter: str) -> pd.DataFrame:
-    """Products matching a partial title search with complaint breakdown."""
-    params: list = [f"%{product_filter.strip().lower()}%"]
-    extra = ""
-    if category and category != "Any":
-        extra = "AND LOWER(category) = %s"
-        params.append(category.lower())
-
+    extra = " ".join(extra_parts)
     return _run_query(f"""
         SELECT
             COALESCE(NULLIF(TRIM(title), ''), 'Untitled Product') AS product,
@@ -517,11 +506,11 @@ def _query_product_details(category: str, product_filter: str) -> pd.DataFrame:
             MAX(review_date)                            AS latest_review
         FROM RAG.REVIEW_DOCUMENTS
         WHERE complaint_type IN ({_TYPES_IN})
-          AND LOWER(title) LIKE %s
+          AND title IS NOT NULL
         {extra}
         GROUP BY title, asin, brand, complaint_type, complaint_subtype
         ORDER BY complaint_count DESC
-        LIMIT 50
+        LIMIT {int(limit)}
     """, params)
 
 
@@ -682,120 +671,107 @@ def _render_product_health_tab(category: str, complaint_type: str) -> None:
     # -----------------------------------------------------------------------
     # Section 5: Brand & Product search
     # -----------------------------------------------------------------------
-    search_col1, search_col2 = st.columns(2)
-
-    with search_col1:
+    s1, s2, s3 = st.columns([2, 2, 1])
+    with s1:
         st.markdown("#### Search by Brand")
         brand_filter = st.text_input(
             "",
             placeholder="e.g. Sony, Samsung, Instant Pot",
             key="brand_filter",
         )
-
-    with search_col2:
+    with s2:
         st.markdown("#### Search by Product")
         product_filter = st.text_input(
             "",
             placeholder="e.g. headphones, coffee maker, USB cable",
             key="product_filter",
         )
+    with s3:
+        st.markdown("#### Max Rows")
+        row_limit = st.number_input(
+            "",
+            min_value=10,
+            max_value=5000,
+            value=50,
+            step=50,
+            key="row_limit",
+            help="How many rows to return. Default 50. Max 5,000.",
+        )
 
-    # ---- Brand results ----
-    if brand_filter.strip():
-        with st.spinner(f"Loading results for brand '{brand_filter}'…"):
+    has_brand = bool(brand_filter.strip())
+    has_product = bool(product_filter.strip())
+
+    if has_brand or has_product:
+        # Build a descriptive label for the spinner / chart title
+        if has_brand and has_product:
+            search_label = f"brand '{brand_filter}' + product '{product_filter}'"
+        elif has_brand:
+            search_label = f"brand '{brand_filter}'"
+        else:
+            search_label = f"product '{product_filter}'"
+
+        with st.spinner(f"Loading results for {search_label}…"):
             try:
-                bp_df = _query_brand_products(category, brand_filter)
+                res_df = _query_complaints(
+                    category,
+                    brand_filter.strip() if has_brand else "",
+                    product_filter.strip() if has_product else "",
+                    int(row_limit),
+                )
             except Exception as e:
                 st.error(str(e))
-                bp_df = pd.DataFrame()
+                res_df = pd.DataFrame()
 
-        if bp_df.empty:
-            st.warning(f"No products found for brand matching '{brand_filter}'.")
+        if res_df.empty:
+            st.warning(f"No results found for {search_label}.")
         else:
-            brand_ct = (
-                bp_df.groupby("complaint_type")["complaint_count"]
+            # Complaint type breakdown chart
+            ct_agg = (
+                res_df.groupby("complaint_type")["complaint_count"]
                 .sum().reset_index()
                 .sort_values("complaint_count", ascending=False)
             )
-            brand_ct["complaint_type"] = brand_ct["complaint_type"].map(_fmt)
-            fig_b = px.bar(
-                brand_ct, x="complaint_type", y="complaint_count",
+            ct_agg["complaint_type"] = ct_agg["complaint_type"].map(_fmt)
+            fig_s = px.bar(
+                ct_agg, x="complaint_type", y="complaint_count",
                 color="complaint_type",
                 color_discrete_sequence=CHART_COLORS,
-                title=f"Complaint Breakdown — {brand_filter}",
+                title=f"Complaint Breakdown — {search_label.title()}",
                 labels={"complaint_count": "Complaints", "complaint_type": ""},
             )
-            fig_b.update_layout(
+            fig_s.update_layout(
                 title_x=0.5, title_font_size=14,
                 height=280, margin=dict(t=40, b=10, l=10, r=10),
                 showlegend=False,
             )
-            st.plotly_chart(fig_b, use_container_width=True)
+            st.plotly_chart(fig_s, use_container_width=True)
 
-            display_b = bp_df.copy()
-            display_b.columns = ["Product", "Product ID", "Complaint Type", "Complaint Subtype",
-                                  "Complaints", "Avg Signal Score", "Earliest Review", "Latest Review"]
-            display_b["Product"] = display_b["Product"].apply(html_lib.unescape)
-            display_b["Complaint Type"] = display_b["Complaint Type"].map(_fmt)
-            display_b["Complaint Subtype"] = display_b["Complaint Subtype"].str.replace("_", " ").str.title()
-            st.dataframe(_style_df(display_b), use_container_width=True)
+            display_s = res_df.copy()
+            display_s.columns = [
+                "Product", "Product ID", "Brand", "Complaint Type", "Complaint Subtype",
+                "Complaints", "Avg Signal Score", "Earliest Review", "Latest Review",
+            ]
+            display_s["Product"] = display_s["Product"].apply(html_lib.unescape)
+            display_s["Complaint Type"] = display_s["Complaint Type"].map(_fmt)
+            display_s["Complaint Subtype"] = display_s["Complaint Subtype"].str.replace("_", " ").str.title()
+            st.caption(f"Showing {len(display_s):,} rows")
+            st.dataframe(_style_df(display_s), use_container_width=True)
 
+            fname = (
+                f"signalflowai_brand_{brand_filter.strip()}_product_{product_filter.strip()}.csv"
+                if has_brand and has_product
+                else f"signalflowai_brand_{brand_filter.strip()}.csv"
+                if has_brand
+                else f"signalflowai_product_{product_filter.strip()}.csv"
+            )
             st.download_button(
-                label="Download brand data as CSV",
-                data=display_b.to_csv(index=False).encode("utf-8"),
-                file_name=f"signalflowai_brand_{brand_filter.strip()}.csv",
+                label="Download as CSV",
+                data=display_s.to_csv(index=False).encode("utf-8"),
+                file_name=fname,
                 mime="text/csv",
             )
-
-    # ---- Product results ----
-    if product_filter.strip():
-        with st.spinner(f"Loading results for product '{product_filter}'…"):
-            try:
-                pp_df = _query_product_details(category, product_filter)
-            except Exception as e:
-                st.error(str(e))
-                pp_df = pd.DataFrame()
-
-        if pp_df.empty:
-            st.warning(f"No products found matching '{product_filter}'.")
-        else:
-            prod_ct = (
-                pp_df.groupby("complaint_type")["complaint_count"]
-                .sum().reset_index()
-                .sort_values("complaint_count", ascending=False)
-            )
-            prod_ct["complaint_type"] = prod_ct["complaint_type"].map(_fmt)
-            fig_p = px.bar(
-                prod_ct, x="complaint_type", y="complaint_count",
-                color="complaint_type",
-                color_discrete_sequence=CHART_COLORS,
-                title=f"Complaint Breakdown — \"{product_filter}\"",
-                labels={"complaint_count": "Complaints", "complaint_type": ""},
-            )
-            fig_p.update_layout(
-                title_x=0.5, title_font_size=14,
-                height=280, margin=dict(t=40, b=10, l=10, r=10),
-                showlegend=False,
-            )
-            st.plotly_chart(fig_p, use_container_width=True)
-
-            display_p2 = pp_df.copy()
-            display_p2.columns = ["Product", "Product ID", "Brand", "Complaint Type", "Complaint Subtype",
-                                   "Complaints", "Avg Signal Score", "Earliest Review", "Latest Review"]
-            display_p2["Product"] = display_p2["Product"].apply(html_lib.unescape)
-            display_p2["Complaint Type"] = display_p2["Complaint Type"].map(_fmt)
-            display_p2["Complaint Subtype"] = display_p2["Complaint Subtype"].str.replace("_", " ").str.title()
-            st.dataframe(_style_df(display_p2), use_container_width=True)
-
-            st.download_button(
-                label="Download product data as CSV",
-                data=display_p2.to_csv(index=False).encode("utf-8"),
-                file_name=f"signalflowai_product_{product_filter.strip()}.csv",
-                mime="text/csv",
-            )
-
-    if not brand_filter.strip() and not product_filter.strip():
-        st.info("Enter a brand name or product keyword above to explore complaints.")
+    else:
+        st.info("Enter a brand name, a product keyword, or both to explore complaints.")
 
 
 # ---------------------------------------------------------------------------
@@ -847,36 +823,17 @@ def _render_decision_tab(selected_category: str, selected_complaint: str, top_k:
         initial_state["filters"] = sidebar_filters
 
     with st.spinner("Running 4-agent pipeline — Query → Retrieval → Reasoning → Verification…"):
-        t_start = time.time()
         try:
             result = graph.invoke(initial_state)
         except Exception as exc:
             st.error(f"Pipeline error: {exc}")
             return
-        elapsed = time.time() - t_start
 
     # -----------------------------------------------------------------------
     # Decision Intelligence Output
     # -----------------------------------------------------------------------
     final_answer = result.get("final_answer", "")
     sections = _parse_sections(final_answer)
-    evidence_count = result.get("evidence_count", 0)
-
-    # Stats row — evidence count + time taken
-    m1, m2, m3 = st.columns(3)
-    m1.metric("Complaints Analysed", evidence_count)
-    m2.metric("Analysis Time", f"{elapsed:.1f}s")
-    m3.metric("Data Source", "828K Complaints")
-
-    # Key insight callout — first sentence of Issue Summary
-    if "Issue Summary" in sections:
-        first_sentence = sections["Issue Summary"].split(".")[0].strip() + "."
-        st.markdown(
-            f"<div style='border-left:4px solid #29B5E8;padding:10px 16px;"
-            f"border-radius:6px;margin:12px 0;font-size:1.0rem;font-style:italic;'>"
-            f"{first_sentence}</div>",
-            unsafe_allow_html=True,
-        )
 
     st.markdown("### Decision Intelligence")
 
@@ -951,8 +908,28 @@ def main() -> None:
         layout="wide",
     )
 
+    # ── Fixed top banner (HTML-only; Streamlit widgets go below) ──────────────
+    st.markdown(
+        "<div style='"
+        "position:fixed;top:0;left:0;right:0;z-index:9999;"
+        "background:var(--background-color);"
+        "border-bottom:2px solid #29B5E8;"
+        "padding:8px 28px;display:flex;align-items:center;gap:14px;'>"
+        "<span style='font-size:2rem;font-weight:900;color:#29B5E8;"
+        "letter-spacing:-0.5px;'>⚡ SignalFlowAI</span>"
+        "<span style='font-size:0.78rem;color:#888;'>Operational Decision Intelligence</span>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
     st.markdown("""
     <style>
+    /* Hide default Streamlit toolbar header */
+    header[data-testid="stHeader"] { display: none !important; }
+
+    /* Push main content down so it clears the fixed banner */
+    .main .block-container { padding-top: 70px !important; }
+
     /* Metric cards — border accent only, works in light + dark */
     div[data-testid="metric-container"] {
         border: 1px solid #29B5E8;
@@ -1027,24 +1004,8 @@ def main() -> None:
     </style>
     """, unsafe_allow_html=True)
 
-    # Sidebar — logo always visible here (doesn't scroll)
+    # ── Sidebar — filters + retrieval + query history ──────────────────────────
     with st.sidebar:
-        st.markdown(
-            "<div style='padding:4px 0 8px 0'>"
-            "<span style='font-size:1.5rem;font-weight:800;color:#29B5E8;'>⚡ SignalFlowAI</span><br>"
-            "<span style='font-size:0.72rem;color:#888;'>Operational Decision Intelligence</span>"
-            "</div>",
-            unsafe_allow_html=True,
-        )
-        st.divider()
-
-        page = st.segmented_control(
-            "Page",
-            options=["Decision Intelligence", "Product Health"],
-            default="Decision Intelligence",
-            label_visibility="collapsed",
-        )
-
         st.divider()
         st.header("Filters")
         selected_category = st.selectbox("Category", CATEGORIES, format_func=_fmt)
@@ -1061,33 +1022,31 @@ def main() -> None:
         else:
             st.caption("No filters — searching all data")
 
-        if page == "Decision Intelligence":
-            st.divider()
-            st.header("Retrieval")
-            top_k = st.slider(
-                "Top complaints to retrieve",
-                min_value=5,
-                max_value=20,
-                value=10,
-                step=5,
-                help="Number of complaints Cortex Search retrieves — ranked by semantic similarity.",
-            )
+        st.divider()
+        st.header("Retrieval")
+        top_k = st.slider(
+            "Top complaints to retrieve",
+            min_value=10,
+            max_value=50,
+            value=50,
+            step=10,
+            help="Number of complaints Cortex Search retrieves — ranked by semantic similarity.",
+        )
 
-            st.divider()
-            st.header("Recent Queries")
+        st.divider()
+        with st.expander("Recent Queries"):
             history = st.session_state.get("query_history", [])
             if history:
                 for q in reversed(history[-5:]):
                     st.caption(f"› {q}")
             else:
                 st.caption("No queries yet this session.")
-        else:
-            top_k = 10
 
-    # Page routing
-    if page == "Decision Intelligence":
+    # ── Navigation tabs at top of main content ─────────────────────────────────
+    tab1, tab2 = st.tabs(["⚡  Decision Intelligence", "📊  Product Health"])
+    with tab1:
         _render_decision_tab(selected_category, selected_complaint, top_k)
-    else:
+    with tab2:
         _render_product_health_tab(selected_category, selected_complaint)
 
 

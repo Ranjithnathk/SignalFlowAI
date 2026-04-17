@@ -975,14 +975,38 @@ def main() -> None:
         border-radius: 14px !important;
     }
 
-    /* Tab bar */
-    div[data-testid="stTabs"] button[data-baseweb="tab"] {
-        font-weight: 600;
-        font-size: 0.95rem;
+    /* Tab bar — colorful outlined tabs */
+    div[data-testid="stTabs"] {
+        border-bottom: none !important;
     }
-    div[data-testid="stTabs"] button[data-baseweb="tab"][aria-selected="true"] {
+    div[data-testid="stTabs"] > div[role="tablist"] {
+        gap: 8px;
+        padding-bottom: 4px;
+    }
+    div[data-testid="stTabs"] button[data-baseweb="tab"] {
+        font-weight: 700;
+        font-size: 1rem;
+        border: 2px solid #29B5E8 !important;
+        border-radius: 10px !important;
+        padding: 8px 22px !important;
         color: #29B5E8 !important;
-        border-bottom-color: #29B5E8 !important;
+        background: transparent !important;
+        transition: background 0.15s ease, color 0.15s ease;
+    }
+    div[data-testid="stTabs"] button[data-baseweb="tab"]:nth-child(2) {
+        border-color: #E8903E !important;
+        color: #E8903E !important;
+    }
+    div[data-testid="stTabs"] button[data-baseweb="tab"][aria-selected="true"]:nth-child(1) {
+        background: #29B5E8 !important;
+        color: white !important;
+    }
+    div[data-testid="stTabs"] button[data-baseweb="tab"][aria-selected="true"]:nth-child(2) {
+        background: #E8903E !important;
+        color: white !important;
+    }
+    div[data-testid="stTabs"] button[data-baseweb="tab"]:hover {
+        opacity: 0.82;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -1036,27 +1060,6 @@ def main() -> None:
                     st.caption(f"› {q}")
             else:
                 st.caption("No queries yet this session.")
-
-    # ── Top banner — full width of the right pane, opaque, in-flow ───────────
-    # Rendered inside the main content column so it always spans exactly the
-    # right-pane width and resizes automatically when the sidebar is toggled.
-    # st.tabs below this are sticky in Streamlit, keeping navigation visible
-    # while scrolling even after the banner scrolls off.
-    st.markdown(
-        "<div style='"
-        "background:rgba(14,17,23,0.98);"
-        "border-bottom:2px solid #29B5E8;"
-        "box-shadow:0 2px 12px rgba(0,0,0,0.35);"
-        "border-radius:8px;"
-        "padding:12px 24px;margin-bottom:4px;"
-        "display:flex;align-items:center;gap:14px;'>"
-        "<span style='font-size:2.8rem;font-weight:900;color:#29B5E8;"
-        "letter-spacing:-1px;line-height:1.1;'>⚡ SignalFlowAI</span>"
-        "<span style='font-size:1rem;color:#aaa;font-style:italic;'>"
-        "Operational Decision Intelligence</span>"
-        "</div>",
-        unsafe_allow_html=True,
-    )
 
     # ── Navigation tabs (sticky in Streamlit — stays pinned while scrolling) ──
     tab1, tab2 = st.tabs(["⚡  Decision Intelligence", "📊  Product Health"])

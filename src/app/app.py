@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 import html as html_lib
+import time
 import pandas as pd
 import plotly.express as px
 import streamlit as st
@@ -479,12 +480,16 @@ def _query_brand_products(category: str, brand_filter: str) -> pd.DataFrame:
             COALESCE(NULLIF(TRIM(title), ''), 'Untitled Product') AS product,
             asin,
             complaint_type,
-            COUNT(*) AS complaint_count
+            COALESCE(complaint_subtype, '—')            AS complaint_subtype,
+            COUNT(*)                                    AS complaint_count,
+            ROUND(AVG(signal_score), 2)                 AS avg_signal_score,
+            MIN(review_date)                            AS earliest_review,
+            MAX(review_date)                            AS latest_review
         FROM RAG.REVIEW_DOCUMENTS
         WHERE complaint_type IN ({_TYPES_IN})
           AND LOWER(brand) LIKE %s
         {extra}
-        GROUP BY title, asin, complaint_type
+        GROUP BY title, asin, complaint_type, complaint_subtype
         ORDER BY complaint_count DESC
         LIMIT 50
     """, params)
@@ -505,12 +510,16 @@ def _query_product_details(category: str, product_filter: str) -> pd.DataFrame:
             asin,
             brand,
             complaint_type,
-            COUNT(*) AS complaint_count
+            COALESCE(complaint_subtype, '—')            AS complaint_subtype,
+            COUNT(*)                                    AS complaint_count,
+            ROUND(AVG(signal_score), 2)                 AS avg_signal_score,
+            MIN(review_date)                            AS earliest_review,
+            MAX(review_date)                            AS latest_review
         FROM RAG.REVIEW_DOCUMENTS
         WHERE complaint_type IN ({_TYPES_IN})
           AND LOWER(title) LIKE %s
         {extra}
-        GROUP BY title, asin, brand, complaint_type
+        GROUP BY title, asin, brand, complaint_type, complaint_subtype
         ORDER BY complaint_count DESC
         LIMIT 50
     """, params)
@@ -724,9 +733,11 @@ def _render_product_health_tab(category: str, complaint_type: str) -> None:
             st.plotly_chart(fig_b, use_container_width=True)
 
             display_b = bp_df.copy()
-            display_b.columns = ["Product", "Product ID", "Complaint Type", "Complaint Count"]
+            display_b.columns = ["Product", "Product ID", "Complaint Type", "Complaint Subtype",
+                                  "Complaints", "Avg Signal Score", "Earliest Review", "Latest Review"]
             display_b["Product"] = display_b["Product"].apply(html_lib.unescape)
             display_b["Complaint Type"] = display_b["Complaint Type"].map(_fmt)
+            display_b["Complaint Subtype"] = display_b["Complaint Subtype"].str.replace("_", " ").str.title()
             st.dataframe(_style_df(display_b), use_container_width=True)
 
             st.download_button(
@@ -769,9 +780,11 @@ def _render_product_health_tab(category: str, complaint_type: str) -> None:
             st.plotly_chart(fig_p, use_container_width=True)
 
             display_p2 = pp_df.copy()
-            display_p2.columns = ["Product", "Product ID", "Brand", "Complaint Type", "Complaint Count"]
+            display_p2.columns = ["Product", "Product ID", "Brand", "Complaint Type", "Complaint Subtype",
+                                   "Complaints", "Avg Signal Score", "Earliest Review", "Latest Review"]
             display_p2["Product"] = display_p2["Product"].apply(html_lib.unescape)
             display_p2["Complaint Type"] = display_p2["Complaint Type"].map(_fmt)
+            display_p2["Complaint Subtype"] = display_p2["Complaint Subtype"].str.replace("_", " ").str.title()
             st.dataframe(_style_df(display_p2), use_container_width=True)
 
             st.download_button(
@@ -810,16 +823,6 @@ def _render_decision_tab(selected_category: str, selected_complaint: str, top_k:
 
     run_clicked = st.button("Run Analysis", type="primary", use_container_width=True)
 
-    # Active filter indicator - always visible so user knows what's applied
-    _filter_parts = []
-    if selected_category != "Any":
-        _filter_parts.append(f"Category: **{_fmt(selected_category)}**")
-    if selected_complaint != "Any":
-        _filter_parts.append(f"Type: **{_fmt(selected_complaint)}**")
-    _filter_parts.append(f"Top **{top_k}** complaints")
-    st.caption("Filters active - " + " | ".join(_filter_parts) if len(_filter_parts) > 1
-               else "No category/type filters - searching across all data | Top **{}** complaints".format(top_k))
-
     if not run_clicked:
         return
 
@@ -828,32 +831,54 @@ def _render_decision_tab(selected_category: str, selected_complaint: str, top_k:
         st.warning("Please enter a query.")
         return
 
+    # Track query history in session state
+    history = st.session_state.get("query_history", [])
+    if query not in history:
+        history.append(query)
+    st.session_state["query_history"] = history
+
     # Build any sidebar filters
     sidebar_filters = _build_filters(selected_category, selected_complaint)
 
-    # Run the LangGraph pipeline
+    # Run the LangGraph pipeline — timed
     graph = get_graph()
-
     initial_state = {"user_query": query, "top_k": top_k}
     if sidebar_filters:
         initial_state["filters"] = sidebar_filters
 
-    with st.spinner("Running agent pipeline…"):
+    with st.spinner("Running 4-agent pipeline — Query → Retrieval → Reasoning → Verification…"):
+        t_start = time.time()
         try:
             result = graph.invoke(initial_state)
         except Exception as exc:
             st.error(f"Pipeline error: {exc}")
             return
+        elapsed = time.time() - t_start
 
     # -----------------------------------------------------------------------
     # Decision Intelligence Output
     # -----------------------------------------------------------------------
     final_answer = result.get("final_answer", "")
     sections = _parse_sections(final_answer)
-
     evidence_count = result.get("evidence_count", 0)
-    #st.caption(f"Analysis grounded in **{evidence_count} complaints** retrieved from Snowflake Cortex Search")
-    st.markdown("## Decision Intelligence")
+
+    # Stats row — evidence count + time taken
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Complaints Analysed", evidence_count)
+    m2.metric("Analysis Time", f"{elapsed:.1f}s")
+    m3.metric("Data Source", "828K Complaints")
+
+    # Key insight callout — first sentence of Issue Summary
+    if "Issue Summary" in sections:
+        first_sentence = sections["Issue Summary"].split(".")[0].strip() + "."
+        st.markdown(
+            f"<div style='border-left:4px solid #29B5E8;padding:10px 16px;"
+            f"border-radius:6px;margin:12px 0;font-size:1.0rem;font-style:italic;'>"
+            f"{first_sentence}</div>",
+            unsafe_allow_html=True,
+        )
+
+    st.markdown("### Decision Intelligence")
 
     if not sections:
         st.markdown(final_answer)
@@ -1002,31 +1027,39 @@ def main() -> None:
     </style>
     """, unsafe_allow_html=True)
 
-    # Header
-    st.markdown(
-        """
-        <h1 style='margin-bottom:0'>⚡ SignalFlowAI</h1>
-        <p style='color:#888;margin-top:4px;font-size:1.05rem;'>
-        Operational Decision Intelligence Platform
-        </p>
-        <hr style='margin-top:8px;margin-bottom:24px;border-color:#333'>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    # Sidebar
+    # Sidebar — logo always visible here (doesn't scroll)
     with st.sidebar:
-        page = st.radio(
-            "Navigate",
-            ["Decision Intelligence", "Product Health"],
-            index=0,
+        st.markdown(
+            "<div style='padding:4px 0 8px 0'>"
+            "<span style='font-size:1.5rem;font-weight:800;color:#29B5E8;'>⚡ SignalFlowAI</span><br>"
+            "<span style='font-size:0.72rem;color:#888;'>Operational Decision Intelligence</span>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+        st.divider()
+
+        page = st.segmented_control(
+            "Page",
+            options=["Decision Intelligence", "Product Health"],
+            default="Decision Intelligence",
+            label_visibility="collapsed",
         )
 
         st.divider()
         st.header("Filters")
-        st.caption("Narrow retrieval to a specific category or complaint type")
         selected_category = st.selectbox("Category", CATEGORIES, format_func=_fmt)
         selected_complaint = st.selectbox("Complaint Type", COMPLAINT_TYPES, format_func=_fmt)
+
+        # Active filter summary — below the filter boxes
+        _fp = []
+        if selected_category != "Any":
+            _fp.append(f"**{_fmt(selected_category)}**")
+        if selected_complaint != "Any":
+            _fp.append(f"**{_fmt(selected_complaint)}**")
+        if _fp:
+            st.caption("Active filters: " + " · ".join(_fp))
+        else:
+            st.caption("No filters — searching all data")
 
         if page == "Decision Intelligence":
             st.divider()
@@ -1039,6 +1072,15 @@ def main() -> None:
                 step=5,
                 help="Number of complaints Cortex Search retrieves — ranked by semantic similarity.",
             )
+
+            st.divider()
+            st.header("Recent Queries")
+            history = st.session_state.get("query_history", [])
+            if history:
+                for q in reversed(history[-5:]):
+                    st.caption(f"› {q}")
+            else:
+                st.caption("No queries yet this session.")
         else:
             top_k = 10
 

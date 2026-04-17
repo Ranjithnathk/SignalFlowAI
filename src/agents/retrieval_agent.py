@@ -1,5 +1,6 @@
 import os
 import json
+import time
 from dotenv import load_dotenv
 from openai import OpenAI
 from src.retrieval.snowflake_retriever import SnowflakeRetriever
@@ -8,11 +9,21 @@ load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 _retriever = None
+_retriever_created_at: float = 0.0
+_RETRIEVER_MAX_AGE = 45 * 60  # 45 minutes — well within Snowflake's 60-min JWT window
+
 
 def _get_retriever():
-    global _retriever
-    if _retriever is None:
+    global _retriever, _retriever_created_at
+    age = time.time() - _retriever_created_at
+    if _retriever is None or age > _RETRIEVER_MAX_AGE:
+        if _retriever is not None:
+            try:
+                _retriever.close()
+            except Exception:
+                pass
         _retriever = SnowflakeRetriever()
+        _retriever_created_at = time.time()
     return _retriever
 
 RETRIEVAL_AGENT_PROMPT = """

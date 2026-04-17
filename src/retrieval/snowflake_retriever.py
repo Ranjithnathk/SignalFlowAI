@@ -41,6 +41,7 @@ class SnowflakeRetriever:
             schema=os.getenv("SNOWFLAKE_SCHEMA"),
             role=os.getenv("SNOWFLAKE_ROLE"),
             private_key=_load_snowflake_private_key(),
+            client_session_keep_alive=True,
         )
 
     def _reconnect(self):
@@ -57,6 +58,7 @@ class SnowflakeRetriever:
             schema=os.getenv("SNOWFLAKE_SCHEMA"),
             role=os.getenv("SNOWFLAKE_ROLE"),
             private_key=_load_snowflake_private_key(),
+            client_session_keep_alive=True,
         )
 
     @staticmethod

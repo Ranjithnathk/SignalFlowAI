@@ -474,11 +474,6 @@ def _query_brand_products(category: str, brand_filter: str) -> pd.DataFrame:
 
 def _render_product_health_tab(category: str, complaint_type: str) -> None:
     st.markdown("### Review Analytics Dashboard")
-    st.caption(
-        "Based on **828K signal-scored complaints** (signal score ≥ 3) across Electronics and "
-        "Home & Kitchen - filtered from 43M raw reviews via the ETL pipeline. "
-        "Covers the 5 high-impact complaint types only."
-    )
 
     # -----------------------------------------------------------------------
     # Section 1: Overview metrics
@@ -519,7 +514,7 @@ def _render_product_health_tab(category: str, complaint_type: str) -> None:
                 fig.update_traces(textposition="inside", textinfo="percent+label")
                 fig.update_layout(margin=dict(t=10, b=10, l=10, r=10), showlegend=False)
                 st.plotly_chart(fig, use_container_width=True)
-                st.caption("Complaint volume across the 5 defined complaint types.")
+                st.caption("Complaint volume across the 5 defined complaint types")
         except Exception as e:
             st.error(str(e))
 
@@ -531,7 +526,7 @@ def _render_product_health_tab(category: str, complaint_type: str) -> None:
                 if not cat_df.empty:
                     cat_df["category"] = cat_df["category"].map(_fmt)
                     st.bar_chart(cat_df.set_index("category")[["complaint_count"]], use_container_width=True)
-                    st.caption("Complaint volume split by category.")
+                    st.caption("Complaint volume split by category")
             except Exception as e:
                 st.error(str(e))
         else:
@@ -595,9 +590,8 @@ def _render_product_health_tab(category: str, complaint_type: str) -> None:
     # -----------------------------------------------------------------------
     # Section 5: Brand deep-dive - products list
     # -----------------------------------------------------------------------
-    st.markdown("#### Brand Deep-Dive - Products & Complaints")
+    st.markdown("#### Search Brand - Products & Complaints")
     brand_filter = st.text_input(
-        "Search brand (partial match)",
         placeholder="e.g. Sony, Samsung, Instant Pot",
         key="brand_filter",
     )
@@ -704,7 +698,7 @@ def _render_decision_tab(selected_category: str, selected_complaint: str, top_k:
     sections = _parse_sections(final_answer)
 
     evidence_count = result.get("evidence_count", 0)
-    st.caption(f"Analysis grounded in **{evidence_count} complaints** retrieved from Snowflake Cortex Search")
+    #st.caption(f"Analysis grounded in **{evidence_count} complaints** retrieved from Snowflake Cortex Search")
     st.markdown("## Decision Intelligence")
 
     if not sections:
@@ -859,7 +853,7 @@ def main() -> None:
         """
         <h1 style='margin-bottom:0'>⚡ SignalFlowAI</h1>
         <p style='color:#888;margin-top:4px;font-size:1.05rem;'>
-        Operational Decision Intelligence - powered by Snowflake Cortex Search + LangGraph Agents
+        Operational Decision Intelligence Platform
         </p>
         <hr style='margin-top:8px;margin-bottom:24px;border-color:#333'>
         """,
@@ -868,8 +862,8 @@ def main() -> None:
 
     # Sidebar - shared across both tabs
     with st.sidebar:
-        st.header("Filters (optional)")
-        st.caption("Narrow retrieval to a specific category or complaint type.")
+        st.header("Filters")
+        st.caption("Narrow retrieval to a specific category or complaint type")
         selected_category = st.selectbox("Category", CATEGORIES, format_func=_fmt)
         selected_complaint = st.selectbox("Complaint Type", COMPLAINT_TYPES, format_func=_fmt)
 

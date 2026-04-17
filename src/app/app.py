@@ -754,7 +754,11 @@ def _render_product_health_tab(category: str, complaint_type: str) -> None:
             display_s["Product"] = display_s["Product"].apply(html_lib.unescape)
             display_s["Complaint Type"] = display_s["Complaint Type"].map(_fmt)
             display_s["Complaint Subtype"] = display_s["Complaint Subtype"].str.replace("_", " ").str.title()
-            st.caption(f"Showing {len(display_s):,} rows")
+            actual = len(display_s)
+            if actual < int(row_limit):
+                st.caption(f"Showing {actual:,} rows — all available data for this search (fewer than the {int(row_limit):,} requested)")
+            else:
+                st.caption(f"Showing {actual:,} rows — increase Max Rows to retrieve more")
             st.dataframe(_style_df(display_s), use_container_width=True)
 
             fname = (
@@ -908,12 +912,17 @@ def main() -> None:
         layout="wide",
     )
 
-    # ── Fixed top banner (HTML-only; Streamlit widgets go below) ──────────────
+    # ── Fixed top banner — scoped to the right pane only ─────────────────────
+    # left: 21rem matches the default Streamlit sidebar width so the banner
+    # starts exactly where the main content begins (no sidebar overlap).
+    # background is fully opaque so scrolling content never bleeds through.
     st.markdown(
         "<div style='"
-        "position:fixed;top:0;left:0;right:0;z-index:9999;"
-        "background:var(--background-color);"
+        "position:fixed;top:0;left:21rem;right:0;z-index:9999;"
+        "background:rgba(14,17,23,0.98);"
+        "backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);"
         "border-bottom:2px solid #29B5E8;"
+        "box-shadow:0 2px 12px rgba(0,0,0,0.4);"
         "padding:8px 28px;display:flex;align-items:center;gap:14px;'>"
         "<span style='font-size:2rem;font-weight:900;color:#29B5E8;"
         "letter-spacing:-0.5px;'>⚡ SignalFlowAI</span>"

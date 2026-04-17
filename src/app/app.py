@@ -690,12 +690,11 @@ def _render_product_health_tab(category: str, complaint_type: str) -> None:
         st.markdown("#### Max Rows")
         row_limit = st.number_input(
             "",
-            min_value=10,
-            max_value=5000,
+            min_value=1,
             value=50,
             step=50,
             key="row_limit",
-            help="How many rows to return. Default 50. Max 5,000.",
+            help="How many rows to return. Enter any number — if fewer rows exist, all available data is returned.",
         )
 
     has_brand = bool(brand_filter.strip())
@@ -912,33 +911,8 @@ def main() -> None:
         layout="wide",
     )
 
-    # ── Fixed top banner — scoped to the right pane only ─────────────────────
-    # left: 21rem matches the default Streamlit sidebar width so the banner
-    # starts exactly where the main content begins (no sidebar overlap).
-    # background is fully opaque so scrolling content never bleeds through.
-    st.markdown(
-        "<div style='"
-        "position:fixed;top:0;left:21rem;right:0;z-index:9999;"
-        "background:rgba(14,17,23,0.98);"
-        "backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);"
-        "border-bottom:2px solid #29B5E8;"
-        "box-shadow:0 2px 12px rgba(0,0,0,0.4);"
-        "padding:8px 28px;display:flex;align-items:center;gap:14px;'>"
-        "<span style='font-size:2rem;font-weight:900;color:#29B5E8;"
-        "letter-spacing:-0.5px;'>⚡ SignalFlowAI</span>"
-        "<span style='font-size:0.78rem;color:#888;'>Operational Decision Intelligence</span>"
-        "</div>",
-        unsafe_allow_html=True,
-    )
-
     st.markdown("""
     <style>
-    /* Hide default Streamlit toolbar header */
-    header[data-testid="stHeader"] { display: none !important; }
-
-    /* Push main content down so it clears the fixed banner */
-    .main .block-container { padding-top: 70px !important; }
-
     /* Metric cards — border accent only, works in light + dark */
     div[data-testid="metric-container"] {
         border: 1px solid #29B5E8;
@@ -1051,7 +1025,27 @@ def main() -> None:
             else:
                 st.caption("No queries yet this session.")
 
-    # ── Navigation tabs at top of main content ─────────────────────────────────
+    # ── Top banner — full width of the right pane, opaque, in-flow ───────────
+    # Rendered inside the main content column so it always spans exactly the
+    # right-pane width and resizes automatically when the sidebar is toggled.
+    # st.tabs below this are sticky in Streamlit, keeping navigation visible
+    # while scrolling even after the banner scrolls off.
+    st.markdown(
+        "<div style='"
+        "background:rgba(14,17,23,0.98);"
+        "border-bottom:2px solid #29B5E8;"
+        "box-shadow:0 2px 12px rgba(0,0,0,0.35);"
+        "border-radius:8px;"
+        "padding:12px 24px;margin-bottom:4px;"
+        "display:flex;align-items:center;gap:14px;'>"
+        "<span style='font-size:2.1rem;font-weight:900;color:#29B5E8;"
+        "letter-spacing:-0.5px;line-height:1.1;'>⚡ SignalFlowAI</span>"
+        "<span style='font-size:0.8rem;color:#aaa;'>Operational Decision Intelligence</span>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+    # ── Navigation tabs (sticky in Streamlit — stays pinned while scrolling) ──
     tab1, tab2 = st.tabs(["⚡  Decision Intelligence", "📊  Product Health"])
     with tab1:
         _render_decision_tab(selected_category, selected_complaint, top_k)

@@ -591,7 +591,7 @@ def _render_product_health_tab(category: str, complaint_type: str) -> None:
     # Section 5: Brand deep-dive - products list
     # -----------------------------------------------------------------------
     st.markdown("#### Search Brand - Products & Complaints")
-    brand_filter = st.text_input(
+    brand_filter = st.text_input("",
         placeholder="e.g. Sony, Samsung, Instant Pot",
         key="brand_filter",
     )
